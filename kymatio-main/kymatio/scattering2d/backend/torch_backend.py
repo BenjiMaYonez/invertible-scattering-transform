@@ -128,6 +128,13 @@ class TorchBackend2D(TorchBackend):
 
         return out
 
+    #BINYAMIN - START CHNAGE
+    @classmethod
+    def fft(cls, x):
+        cls.contiguous_check(x)
+        return _fft(x)
+    #BINYAMIN - END CHNAGE
+
     # we cast to complex here then fft rather than use torch.rfft as torch.rfft is
     # inefficent.
     @classmethod
@@ -153,6 +160,22 @@ class TorchBackend2D(TorchBackend):
         cls.complex_check(x)
 
         return _ifft(x)
+    
+    #BINYAMIN - START CHNAGE
+    @classmethod
+    def custom_relu_split(cls ,input):
+        real_part = input.real
+        imag_part = input.imag
+
+        # Apply ReLU to real and imaginary parts, and their negatives
+        relu_real = torch.relu(real_part)
+        relu_imag = torch.relu(imag_part)
+        relu_neg_real = torch.relu(-real_part)
+        relu_neg_imag = torch.relu(-imag_part)
+
+        return relu_real, relu_imag, relu_neg_real, relu_neg_imag
+    #BINYAMIN - END CHNAGE
+
 
     @staticmethod
     def unpad(in_):
@@ -178,6 +201,9 @@ class TorchBackend2D(TorchBackend):
     @staticmethod
     def stack(arrays):
         return TorchBackend.stack(arrays, -3)
+    
+
+     
 
 
 backend = TorchBackend2D

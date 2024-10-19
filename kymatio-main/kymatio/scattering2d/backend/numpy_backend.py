@@ -83,6 +83,12 @@ class NumpyBackend2D(NumpyBackend):
     def stack(cls, arrays):
         return cls._np.stack(arrays, axis=-3)
 
+    #BINYAMIN - START CHNAGE
+    @classmethod
+    def fft(cls, x):
+        return cls._fft.fft2(x)
+    #BINYAMIN - END CHNAGE
+
     @classmethod
     def rfft(cls, x):
         cls.real_check(x)
@@ -97,6 +103,20 @@ class NumpyBackend2D(NumpyBackend):
     def ifft(cls, x):
         cls.complex_check(x)
         return cls._fft.ifft2(x)
+    
+    #BINYAMIN - START CHNAGE
+    @classmethod
+    def custom_relu_split(cls, x):
+        real_part = cls._np.real(x)
+        imag_part = cls._np.imag(x)
 
+        # Apply ReLU to real and imaginary parts, and their negatives
+        relu_real = cls._np.maximum(0, real_part)
+        relu_imag = cls._np.maximum(0, imag_part)
+        relu_neg_real = cls._np.maximum(0, -real_part)
+        relu_neg_imag = cls._np.maximum(0, -imag_part)
+
+        return relu_real, relu_imag, relu_neg_real, relu_neg_imag
+    #BINYAMIN - END CHNAGE
 
 backend = NumpyBackend2D
