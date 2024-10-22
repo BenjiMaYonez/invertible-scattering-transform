@@ -100,11 +100,13 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     stack = backend.stack
     fft = backend.fft
     custom_relu_split = backend.custom_relu_split
+    pad_cmplx = backend.pad_cmplx
+    unpad_cmplx = backend.unpad_cmplx
 
     # Define lists for output.
     out_S_0, out_S_1, out_S_2 = [], [], []
 
-    U_r = pad(x)
+    U_r = pad_cmplx(pad,x)
 
     U_0_c = fft(U_r)#F(x)
 
@@ -114,7 +116,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
     #S_0 = irfft(U_1_c)
     S_0 = ifft(U_1_c)# F^-1(<F(x), F(father)>)  = x * father
-    S_0 = unpad(S_0)
+    S_0 = unpad_cmplx(unpad,S_0)
 
     out_S_0.append({'coef': S_0,
                     'j': (),
@@ -140,7 +142,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
         S_1 = [cdgmm(signal, phi['levels'][j1]) for signal in U_1]
         S_1 = [subsample_fourier(signal, k=2 ** (J - j1)) for signal in S_1]
         S_1 = [ifft(signal) for signal in S_1]
-        S_1 = [unpad(signal) for signal in S_1]
+        S_1 = [unpad_cmplx(unpad,signal) for signal in S_1]
 
 
         for signal in S_1:
@@ -173,7 +175,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
                 S_2 = [cdgmm(signal, phi['levels'][j2]) for signal in U_2]
                 S_2 = [subsample_fourier(signal, k=2 ** (J - j2)) for signal in S_2]
                 S_2 = [ifft(signal) for signal in S_2]
-                S_2 = [unpad(signal) for siganl in S_2]
+                S_2 = [unpad_cmplx(unpad,signal) for siganl in S_2]
 
 
                 for signal in S_2:

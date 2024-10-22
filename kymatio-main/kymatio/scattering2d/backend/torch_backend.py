@@ -129,9 +129,16 @@ class TorchBackend2D(TorchBackend):
         return out
 
     #BINYAMIN - START CHNAGE
+    @staticmethod
+    def _is_real(x):
+        return x.shape[-1] == 1
+
     @classmethod
     def fft(cls, x):
         cls.contiguous_check(x)
+        if cls._is_real(x):
+            return cls.rfft(x)
+
         return _fft(x)
     #BINYAMIN - END CHNAGE
 
@@ -162,6 +169,26 @@ class TorchBackend2D(TorchBackend):
         return _ifft(x)
     
     #BINYAMIN - START CHNAGE
+    @classmethod
+    def pad_cmplx(cls, pad, x):
+        if not torch.is_complex(x):
+            return pad(x)
+
+        real_part = x.real
+        imag_part = x.imag
+        padded_real = pad(real_part)
+        padded_imag = pad(imag_part)
+        return torch.complex(padded_real, padded_imag)
+
+    @classmethod
+    def unpad_cmplx(cls, unpad, x):
+        if not torch.is_complex(x):
+            return unpad(x)
+
+        real_unpadded = unpad(x.real)
+        imag_unpadded = unpad(x.imag)
+        return torch.complex(real_unpadded, imag_unpadded)
+
     @classmethod
     def custom_relu_split(cls ,input):
         real_part = input.real
@@ -201,6 +228,7 @@ class TorchBackend2D(TorchBackend):
     @staticmethod
     def stack(arrays):
         return TorchBackend.stack(arrays, -3)
+
     
 
      

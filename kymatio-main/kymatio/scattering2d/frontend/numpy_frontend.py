@@ -43,7 +43,7 @@ class ScatteringNumPy2D(ScatteringNumPy, ScatteringBase2D):
         #        self.L, self.phi, self.psi, self.max_order, self.out_type)
         
         #new code
-        S = invertibleScattering2d(input, self.pad, self.unpad, self.J,
+        S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
                self.L, self.phi, self.psi, self.max_order, self.out_type)
         #BINYAMIN - END CHANGE
 
