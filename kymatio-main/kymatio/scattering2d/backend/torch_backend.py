@@ -128,6 +128,7 @@ class TorchBackend2D(TorchBackend):
 
         return out
 
+
     #BINYAMIN - START CHNAGE
     @staticmethod
     def _is_real(x):
@@ -136,8 +137,8 @@ class TorchBackend2D(TorchBackend):
     @classmethod
     def fft(cls, x):
         cls.contiguous_check(x)
-        if cls._is_real(x):
-            return cls.rfft(x)
+        # if cls._is_real(x):
+        #     return cls.rfft(x)
 
         return _fft(x)
     #BINYAMIN - END CHNAGE
@@ -171,28 +172,51 @@ class TorchBackend2D(TorchBackend):
     #BINYAMIN - START CHNAGE
     @classmethod
     def pad_cmplx(cls, pad, x):
-        if not torch.is_complex(x):
-            return pad(x)
-
-        real_part = x.real
-        imag_part = x.imag
-        padded_real = pad(real_part)
-        padded_imag = pad(imag_part)
-        return torch.complex(padded_real, padded_imag)
+        if torch.is_complex(x):
+            real_part = x.real
+            imag_part = x.imag
+            padded_real = pad(real_part)
+            padded_imag = pad(imag_part)
+            return torch.view_as_real(torch.complex(padded_real, padded_imag))
+        
+        if x.ndim == 4 and x.shape[-1] == 2: #x.shape = [n1,n2,...,nk,2]  last dimansion is real,cmplx
+            real_part = x[...,0]
+            imag_part = x[...,1]
+            padded_real = pad(real_part)
+            padded_imag = pad(imag_part)
+            return torch.stack((real_part,imag_part), dim=-1)
+        
+        #x.shape = [n1,n2,...,nk] - only real
+        result = pad(x)
+        imaginary_part = torch.zeros_like(result)
+        result = torch.cat((result, imaginary_part), dim=-1)
+        return result
 
     @classmethod
     def unpad_cmplx(cls, unpad, x):
-        if not torch.is_complex(x):
-            return unpad(x)
-
-        real_unpadded = unpad(x.real)
-        imag_unpadded = unpad(x.imag)
-        return torch.complex(real_unpadded, imag_unpadded)
+        if torch.is_complex(x):
+            real_part = x.real
+            imag_part = x.imag
+            unpadded_real = unpad(real_part)
+            unpadded_imag = unpad(imag_part)
+            return torch.view_as_real(torch.complex(unpadded_real, unpadded_imag))
+        
+        if x.ndim == 4 and x.shape[-1] == 2:
+            real_part = x[...,0]
+            imag_part = x[...,1]
+            padded_real = unpad(real_part)
+            padded_imag = unpad(imag_part)
+            return torch.stack((real_part,imag_part), dim=-1)
+        
+        result = unpad(x)
+        imaginary_part = torch.zeros_like(result)
+        result = torch.stack((result, imaginary_part), dim=-1)
+        return result
 
     @classmethod
     def custom_relu_split(cls ,input):
-        real_part = input.real
-        imag_part = input.imag
+        real_part = input[...,0]
+        imag_part = input[...,1]
 
         # Apply ReLU to real and imaginary parts, and their negatives
         relu_real = torch.relu(real_part)
@@ -200,7 +224,14 @@ class TorchBackend2D(TorchBackend):
         relu_neg_real = torch.relu(-real_part)
         relu_neg_imag = torch.relu(-imag_part)
 
-        return relu_real, relu_imag, relu_neg_real, relu_neg_imag
+        seperated_signals = [relu_real, relu_imag, relu_neg_real, relu_neg_imag]
+        result = []
+        for signal_real_part in seperated_signals:
+            signal_imag_part = torch.zeros_like(signal_real_part)
+            signal = torch.stack((signal_real_part, signal_imag_part), dim=-1)
+            result.append(signal)
+
+        return tuple(result)
     #BINYAMIN - END CHNAGE
 
 
@@ -221,13 +252,22 @@ class TorchBackend2D(TorchBackend):
                 Output tensor.  Unpadded input.
 
         """
-        in_ = in_[..., 1:-1, 1:-1, :]
-        in_ = in_.reshape(in_.shape[:-1])
+        #BINYAMIN - START CHANGE
+        in_ = in_[..., 1:-1, 1:-1]
+        
+        #in_ = in_.reshape(in_.shape[:-1])
+        #BINYAMIN - END CHANGE
         return in_
 
     @staticmethod
     def stack(arrays):
         return TorchBackend.stack(arrays, -3)
+        
+    #BINYAMIN - START CHNAGE
+    @staticmethod
+    def stack1(arrays):
+        return TorchBackend.stack(arrays, 1)
+    #BINYAMIN - END CHNAGE
 
     
 

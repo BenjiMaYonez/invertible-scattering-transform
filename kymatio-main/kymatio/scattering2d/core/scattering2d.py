@@ -102,6 +102,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     custom_relu_split = backend.custom_relu_split
     pad_cmplx = backend.pad_cmplx
     unpad_cmplx = backend.unpad_cmplx
+    stack1 = backend.stack1
 
     # Define lists for output.
     out_S_0, out_S_1, out_S_2 = [], [], []
@@ -153,14 +154,14 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
         if max_order < 2:
             continue
-        for n2 in range(len(psi)):
-            j2 = psi[n2]['j']
-            theta2 = psi[n2]['theta']
+        for U_1_c in U_1: #U_1_c = F(pos_real(x*mother))
+            for n2 in range(len(psi)):
+                j2 = psi[n2]['j']
+                theta2 = psi[n2]['theta']
 
-            if j2 <= j1:
-                continue
+                if j2 <= j1:
+                    continue
         
-            for U_1_c in U_1: #U_1_c = F(pos_real(x*mother))  
                 U_2_c = cdgmm(U_1_c, psi[n2]['levels'][j1]) # < F(pos_real(x*mother_1)) , F(mother_2) >
                 U_2_c = subsample_fourier(U_2_c, k=2 ** (j2 - j1))  
                 U_2_c = ifft(U_2_c) # pos_real(x*mother_1) * mother_2
@@ -190,7 +191,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     out_S.extend(out_S_2)
 
     if out_type == 'array':
-        out_S = stack([x['coef'] for x in out_S])
+        out_S = stack1([x['coef'] for x in out_S])
 
     return out_S
 

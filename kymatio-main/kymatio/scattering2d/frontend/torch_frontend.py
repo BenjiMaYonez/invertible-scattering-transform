@@ -109,8 +109,11 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
 
 
         if self.out_type == 'array':
-            scattering_shape = S.shape[-3:]
+            #BINYAMIN - START CHANGE 
+            scattering_shape = S.shape[-4:]
+            #BINYAMIN -END CHANGE
             S = S.reshape(batch_shape + scattering_shape)
+
         else:
             scattering_shape = S[0]['coef'].shape[-2:]
             new_shape = batch_shape + scattering_shape
