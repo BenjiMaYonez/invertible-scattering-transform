@@ -25,7 +25,8 @@ prng = RandomState(42)
 ###############################################
 # Create dataloaders
 from torchvision import datasets, transforms
-import kymatio.datasets as scattering_datasets
+import  kymatio.datasets as scattering_datasets
+
 
 num_workers = 4
 if use_cuda:
@@ -102,26 +103,25 @@ def test(model, device, test_loader, scattering):
 
 from kymatio.torch import Scattering2D
 import torch.optim
-import math
+
+if __name__ == '__main__':
+    # Evaluate linear model on top of scattering
+    scattering = Scattering2D(shape = (28, 28), J=2).to(device)
+    K = 81 #Number of output coefficients for each spatial postiion
 
 
-# Evaluate linear model on top of scattering
-scattering = Scattering2D(shape = (28, 28), J=2).to(device)
-K = 81 #Number of output coefficients for each spatial postiion
+    model = nn.Sequential(
+        View(K, 7, 7),
+        nn.BatchNorm2d(K),
+        View(K * 7 * 7),
+        nn.Linear(K * 7 * 7, 10)
+    ).to(device)
 
+    # Optimizer
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9,
+                                weight_decay=0.0005)
+    for epoch in range(0, 20):
+        train( model, device, train_loader, optimizer, scattering)
 
-model = nn.Sequential(
-    View(K, 7, 7),
-    nn.BatchNorm2d(K),
-    View(K * 7 * 7),
-    nn.Linear(K * 7 * 7, 10)
-).to(device)
-
-# Optimizer
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9,
-                            weight_decay=0.0005)
-for epoch in range(0, 20):
-    train( model, device, train_loader, optimizer, scattering)
-
-acc = test(model, device, test_loader, scattering)
-print('Scattering order 2 linear model test accuracy: %.2f' % acc)
+    acc = test(model, device, test_loader, scattering)
+    print('Scattering order 2 linear model test accuracy: %.2f' % acc)

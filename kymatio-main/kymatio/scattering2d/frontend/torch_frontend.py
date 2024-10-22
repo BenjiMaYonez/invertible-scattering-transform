@@ -3,6 +3,9 @@ import torch
 from .base_frontend import ScatteringBase2D
 from ...scattering2d.core.scattering2d import scattering2d
 from ...frontend.torch_frontend import ScatteringTorch
+#BINYAMIN - START CHANGE
+from ...scattering2d.core.scattering2d import invertibleScattering2d
+#BINYAMIN - END CHANGE
 
 
 class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
@@ -95,8 +98,15 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
 
         input = input.reshape((-1,) + signal_shape)
 
-        S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                            self.L, phi, psi, self.max_order, self.out_type)
+        #BINYAMIN - START CHANGE
+        #old code
+        # S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
+        #                     self.L, phi, psi, self.max_order, self.out_type)
+        #new code
+        S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
+                         self.L, phi, psi, self.max_order, self.out_type)
+        #BINYAMIN - END CHANGE
+
 
         if self.out_type == 'array':
             scattering_shape = S.shape[-3:]
