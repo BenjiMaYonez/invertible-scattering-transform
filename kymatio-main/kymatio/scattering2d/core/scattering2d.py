@@ -102,6 +102,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     custom_relu_split = backend.custom_relu_split
     pad_cmplx = backend.pad_cmplx
     unpad_cmplx = backend.unpad_cmplx
+    stack1 = backend.stack1
 
     # Define lists for output.
     out_S_0, out_S_1, out_S_2 = [], [], []
@@ -114,8 +115,9 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     U_1_c = cdgmm(U_0_c, phi['levels'][0])#<F(x), F(father)>
     U_1_c = subsample_fourier(U_1_c, k=2 ** J)
 
-    #S_0 = irfft(U_1_c)
-    S_0 = ifft(U_1_c)# F^-1(<F(x), F(father)>)  = x * father
+    #changed from ifft to irfft for the output to be real valued
+    S_0 = irfft(U_1_c)
+    #S_0 = ifft(U_1_c)# F^-1(<F(x), F(father)>)  = x * father
     S_0 = unpad_cmplx(unpad,S_0)
 
     out_S_0.append({'coef': S_0,
@@ -141,7 +143,9 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
         # Second low pass filter
         S_1 = [cdgmm(signal, phi['levels'][j1]) for signal in U_1]
         S_1 = [subsample_fourier(signal, k=2 ** (J - j1)) for signal in S_1]
-        S_1 = [ifft(signal) for signal in S_1]
+        #changed from ifft to irfft for the output to be real valued
+        S_1 = [irfft(signal) for signal in S_1]
+        #S_1 = [ifft(signal) for signal in S_1]
         S_1 = [unpad_cmplx(unpad,signal) for signal in S_1]
 
 
@@ -153,14 +157,14 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
         if max_order < 2:
             continue
-        for n2 in range(len(psi)):
-            j2 = psi[n2]['j']
-            theta2 = psi[n2]['theta']
+        for U_1_c in U_1: #U_1_c = F(pos_real(x*mother))
+            for n2 in range(len(psi)):
+                j2 = psi[n2]['j']
+                theta2 = psi[n2]['theta']
 
-            if j2 <= j1:
-                continue
+                if j2 <= j1:
+                    continue
         
-            for U_1_c in U_1: #U_1_c = F(pos_real(x*mother))  
                 U_2_c = cdgmm(U_1_c, psi[n2]['levels'][j1]) # < F(pos_real(x*mother_1)) , F(mother_2) >
                 U_2_c = subsample_fourier(U_2_c, k=2 ** (j2 - j1))  
                 U_2_c = ifft(U_2_c) # pos_real(x*mother_1) * mother_2
@@ -174,8 +178,11 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
                 # Third low pass filter
                 S_2 = [cdgmm(signal, phi['levels'][j2]) for signal in U_2]
                 S_2 = [subsample_fourier(signal, k=2 ** (J - j2)) for signal in S_2]
-                S_2 = [ifft(signal) for signal in S_2]
-                S_2 = [unpad_cmplx(unpad,signal) for siganl in S_2]
+
+                #changed from ifft to irfft for the output to be real valued
+                S_2 = [irfft(signal) for signal in S_2]
+                #S_2 = [ifft(signal) for signal in S_2]
+                S_2 = [unpad_cmplx(unpad,signal) for signal in S_2]
 
 
                 for signal in S_2:
@@ -190,7 +197,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     out_S.extend(out_S_2)
 
     if out_type == 'array':
-        out_S = stack([x['coef'] for x in out_S])
+        out_S = stack1([x['coef'] for x in out_S])
 
     return out_S
 
