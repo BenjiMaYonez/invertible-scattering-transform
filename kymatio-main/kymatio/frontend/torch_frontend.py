@@ -1,6 +1,7 @@
 import torch.nn as nn
 
 class ScatteringTorch(nn.Module):
+    #TODO - cahnge this?
     def __init__(self):
         super(ScatteringTorch, self).__init__()
         self.frontend_name = 'torch'
