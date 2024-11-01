@@ -209,8 +209,16 @@ class TorchBackend2D(TorchBackend):
             return torch.stack((real_part,imag_part), dim=-1)
         
         result = unpad(x)
-        imaginary_part = torch.zeros_like(result)
-        result = torch.stack((result, imaginary_part), dim=-1)
+        #-----------------------
+        # now x is real values,
+        # so : x.shape = [batch_size, num_coefficients, width, length, 1]
+        # no need to add zeros to create imag part 
+        # want the output of scattering to be real
+        #----------------------------
+
+        #imaginary_part = torch.zeros_like(result)
+        #result = torch.stack((result, imaginary_part), dim=-1)
+
         return result
 
     @classmethod
@@ -253,9 +261,12 @@ class TorchBackend2D(TorchBackend):
 
         """
         #BINYAMIN - START CHANGE
-        in_ = in_[..., 1:-1, 1:-1]
+        #new version
+        #in_ = in_[..., 1:-1, 1:-1]
         
-        #in_ = in_.reshape(in_.shape[:-1])
+        #old version
+        in_ = in_[..., 1:-1, 1:-1, :]
+        in_ = in_.reshape(in_.shape[:-1])
         #BINYAMIN - END CHANGE
         return in_
 
