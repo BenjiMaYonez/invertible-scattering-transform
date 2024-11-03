@@ -273,15 +273,17 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
         j1 = psi[n1]['j']
         theta1 = psi[n1]['theta']
 
-        if last_n != None:
+        if last_n == None:
+            last_j = 0
+        else:
             last_j = psi[last_n]['j']
-            if j1 <= last_j :
-                continue
+
+        if j1 <= last_j and last_n != None:
+            continue
 
 
-        U_1_c = cdgmm(U_0_c, psi[n1]['levels'][0])#< F(x) , F(mother_n1) >
-        if j1 > 0:
-            U_1_c = subsample_fourier(U_1_c, k=2 ** j1)
+        U_1_c = cdgmm(U_0_c, psi[n1]['levels'][last_j])#< F(x) , F(mother_n1) >
+        U_1_c = subsample_fourier(U_1_c, k=2 ** (j1 - last_j))
         U_1_c = ifft(U_1_c)# x * mother_n1
         positive_real_U1, positive_imag_U1, neg_real_U1, neg_imag_U1 = custom_relu_split(U_1_c)
         

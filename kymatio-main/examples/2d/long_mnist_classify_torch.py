@@ -7,11 +7,30 @@ Please also see more extensive classification examples/2d/cifar.py
 that consider training CNNs on top of the scattering. These are
 are included as  executable script with command line arguments
 """
-
-
+#BINYAMIN - START CHANGE
+##############################################################################
+import math
+def num_of_scattering_coefficients(max_depth, J):
+    total_sum = 0
+    for q in range(0, max_depth + 1):
+        combination = math.comb(J, q)
+        term = combination * (4 ** q) * (8 ** q)
+        total_sum += term
+    return total_sum
+#BINYAMIN - END CHANGE
 ###############################################################################
 # If a GPU is available, let's use it!
 import torch
+is_cmpl = torch.cuda._is_compiled()
+
+if torch.cuda._nvml_based_avail():
+    dvc_cnt = torch.cuda.device_count()
+else:
+        # The default availability inspection never throws and returns 0 if the driver is missing or can't
+        # be initialized. This uses the CUDA Runtime API `cudaGetDeviceCount` which in turn initializes the CUDA Driver
+        # API via `cuInit`
+        dvc_cnt =  torch._C._cuda_getDeviceCount() > 0
+
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
@@ -107,20 +126,22 @@ import torch.optim
 
 if __name__ == '__main__':
     # Evaluate linear model on top of scattering
-    scattering = Scattering2D(shape = (28, 28), J=2).to(device)
+    J = 3
+    max_order = 3
+    scattering = Scattering2D(shape = (28, 28), J=J, max_order=max_order).to(device)
     #BINYAMIN - START CHANGE
     #old code
     #K = 81 #Number of output coefficients for each spatial postiion
     
     #new code
-    K = 1089
+    K = num_of_scattering_coefficients(max_order, J)
     #BINYAMIN - END CHANGE
 
     model = nn.Sequential(
-        View(K, 7, 7),
+        View(K, 3, 3),
         nn.BatchNorm2d(K),
-        View(K * 7 * 7),
-        nn.Linear(K * 7 * 7, 10)
+        View(K * 3 * 3),
+        nn.Linear(K * 3 * 3, 10)
     ).to(device)
 
     # Optimizer
