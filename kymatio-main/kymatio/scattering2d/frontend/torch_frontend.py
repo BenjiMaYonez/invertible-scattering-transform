@@ -10,7 +10,7 @@ from ...scattering2d.core.scattering2d import invertibleScattering2d
 
 class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='torch', out_type='array'):
+            backend='torch', out_type='array', model_kind='scattering'):
         ScatteringTorch.__init__(self)
         ScatteringBase2D.__init__(**locals())
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
@@ -100,11 +100,15 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
 
         #BINYAMIN - START CHANGE
         #old code
-        # S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
-        #                     self.L, phi, psi, self.max_order, self.out_type)
+        if self.model_kind == 'scattering':
+            S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
+                                    self.L, phi, psi, self.max_order, self.out_type)
         #new code
-        S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                         self.L, phi, psi, self.max_order, self.out_type)
+        elif self.model_kind == 'invertible_scattering':
+            S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
+                            self.L, phi, psi, self.max_order, self.out_type)
+        else:
+            raise RuntimeError(f"got model_kind = {self.model_kind}, can only be scattering or invertible_scattering")
         #BINYAMIN - END CHANGE
 
 
