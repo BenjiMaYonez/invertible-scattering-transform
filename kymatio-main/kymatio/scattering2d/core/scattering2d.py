@@ -239,12 +239,15 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     out_S.append({'coef': S_0,
                     'j': (),
                     'n': (),
-                    'theta': ()})
+                    'theta': (), 
+                    'depth' : 0})
     
 
     recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, 1 ,None, out_type, out_S)
+    # print("out_s.len : %d \n" %len(out_S) )
     if out_type == 'array':
         out_S = stack1([x['coef'] for x in out_S])
+        # print("out_s.shape : {} \n".format(out_S.shape))
 
     return out_S
 
@@ -305,7 +308,8 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
             out_S.append({'coef': signal,
                             'j': (j1,),
                             'n': (n1,),
-                            'theta': (theta1,)})
+                            'theta': (theta1,), 
+                            'depth' : level})
         
         for U_1_c in U_1:
             recursiveInvertibleScattering2d(U_1_c, pad, unpad, backend, J, L, phi, psi, max_order, level+1, n1, out_type, out_S)
