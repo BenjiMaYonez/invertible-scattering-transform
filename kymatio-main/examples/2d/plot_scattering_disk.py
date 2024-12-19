@@ -19,7 +19,7 @@ from kymatio import Scattering2D
 from PIL import Image
 import os
 
-img_name = os.path.join(os.getcwd(), "images/digit.png")
+img_name = os.path.join(os.getcwd(), "kymatio-main\examples\\2d\images\digit.png")
 
 ####################################################################
 # Scattering computations

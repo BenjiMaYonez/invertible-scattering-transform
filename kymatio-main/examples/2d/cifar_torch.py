@@ -14,6 +14,18 @@ from kymatio.torch import Scattering2D
 import kymatio.datasets as scattering_datasets
 import argparse
 
+#BINYAMIN - START CHANGE
+##############################################################################
+import math
+def num_of_scattering_coefficients(max_depth, J):
+    total_sum = 0
+    for q in range(0, max_depth + 1):
+        combination = math.comb(J, q)
+        term = combination * (4 ** q) * (8 ** q)
+        total_sum += term
+    return total_sum
+#BINYAMIN - END CHANGE
+###############################################################################
 
 class Scattering2dCNN(nn.Module):
     '''
@@ -125,11 +137,11 @@ if __name__ == '__main__':
     device = torch.device("cuda" if use_cuda else "cpu")
 
     if args.mode == 1:
-        scattering = Scattering2D(J=2, shape=(32, 32), max_order=1)
-        K = 17*3
+        scattering = Scattering2D(J=2, shape=(32, 32), max_order=1, model_kind='invertible_scattering')
+        K = num_of_scattering_coefficients(J=2,max_depth=1)*3
     else:
-        scattering = Scattering2D(J=2, shape=(32, 32))
-        K = 81*3
+        scattering = Scattering2D(J=2, shape=(32, 32), model_kind='invertible_scattering')
+        K = num_of_scattering_coefficients(J=2,max_depth=2)*3
     scattering = scattering.to(device)
 
 

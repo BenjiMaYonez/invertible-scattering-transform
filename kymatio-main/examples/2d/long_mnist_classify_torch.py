@@ -32,6 +32,7 @@ else:
         dvc_cnt =  torch._C._cuda_getDeviceCount() > 0
 
 use_cuda = torch.cuda.is_available()
+print("use_coda : %s \n" %use_cuda)
 device = torch.device("cuda" if use_cuda else "cpu")
 
 ###############################################################################
@@ -135,6 +136,7 @@ if __name__ == '__main__':
     
     #new code
     K = num_of_scattering_coefficients(max_order, J)
+    print(f'num_of_scattering_coeff : {K} \n' )
     #BINYAMIN - END CHANGE
 
     model = nn.Sequential(
