@@ -16,7 +16,7 @@ import numpy as np
 
 def load_texture(idx):
     # Path to your local CUReT dataset directory
-    dataset_path = 'kth_tips_grey_200x200'
+    dataset_path = os.path.join(current_dir, 'kth_tips_grey_200x200')
 
     # Collect all image file paths from the dataset directory
     image_files = [
