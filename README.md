@@ -39,7 +39,7 @@ This folder contains modified code based on https://github.com/mariaprat/scatter
  **Run Texture Reconstruction**:  The output will be stored as synthesized texture images in the `texture_reconstruction/synthesized_textures` directory.
 
 ### More information
-For more information about the invertible scattering transform , and the code in this project can be found the following document: Invertible%20Scattering%20Transform.pdf
+For more information about the invertible scattering transform , and the code in this project can be found the following document: Invertible Scattering Transform.pdf
 
 ### Credits:
 * Andreux M., Angles T., Exarchakis G., Leonarduzzi R., Rochette G., Thiry L., Zarka J., Mallat S., Andén J., Belilovsky E., Bruna J., Lostanlen V., Chaudhary M., Hirn M. J., Oyallon E., Zhang S., Cella C., Eickenberg M. (2020). Kymatio: Scattering Transforms in Python. Journal of Machine Learning Research 21(60):1−6, 2020
