@@ -2,7 +2,7 @@ import numpy as np
 from scipy.fft import fft2, ifft2
 
 
-def filter_bank(M, N, J, L=8):
+def filter_bank(M, N, J, L=8, downsample=True):
     """
         Builds in Fourier the Morlet filters used for the scattering transform.
         Each single filter is provided as a dictionary with the following keys:
@@ -38,7 +38,10 @@ def filter_bank(M, N, J, L=8):
             # drop the imaginary part, it is zero anyway
             psi_levels = []
             for res in range(min(j + 1, max(J - 1, 1))):
-                psi_levels.append(periodize_filter_fft(psi_signal_fourier, res))
+                if downsample:
+                    psi_levels.append(periodize_filter_fft(psi_signal_fourier, res))
+                else:
+                    psi_levels.append(psi_signal_fourier)
             psi['levels'] = psi_levels
             filters['psi'].append(psi)
 
@@ -47,8 +50,11 @@ def filter_bank(M, N, J, L=8):
     # drop the imaginary part, it is zero anyway
     filters['phi'] = {'levels': [], 'j': J}
     for res in range(J):
-        filters['phi']['levels'].append(
-            periodize_filter_fft(phi_signal_fourier, res))
+        if downsample:
+            filters['phi']['levels'].append(
+                periodize_filter_fft(phi_signal_fourier, res))
+        else:
+            filters['phi']['levels'].append(phi_signal_fourier)
 
     return filters
 

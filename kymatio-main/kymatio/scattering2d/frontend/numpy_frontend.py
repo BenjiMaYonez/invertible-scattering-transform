@@ -1,20 +1,18 @@
 from ...frontend.numpy_frontend import ScatteringNumPy
 from ...scattering2d.core.scattering2d import scattering2d 
-#BINYAMIN - START CHANGE
 from ...scattering2d.core.scattering2d import invertibleScattering2d
-#BINYAMIN - END CHANGE
 from .base_frontend import ScatteringBase2D
 import numpy as np
 
 class ScatteringNumPy2D(ScatteringNumPy, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='numpy', out_type='array'):
+            backend='numpy', out_type='array', downsample=True):
         ScatteringNumPy.__init__(self)
         ScatteringBase2D.__init__(self, J, shape, L, max_order, pre_pad,
-                backend, out_type)
+                backend, out_type, downsample=downsample)
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
         ScatteringBase2D.build(self)
-        ScatteringBase2D.create_filters(self)
+        ScatteringBase2D.create_filters(self, downsample=downsample)
 
     def scattering(self, input):
         self.backend.input_checks(input)
@@ -37,15 +35,12 @@ class ScatteringNumPy2D(ScatteringNumPy, ScatteringBase2D):
 
         input = input.reshape((-1,) + signal_shape)
 
-        #BINYAMIN - START CHANGE
-        #old code
-        #S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
-        #        self.L, self.phi, self.psi, self.max_order, self.out_type)
-        
-        #new code
-        S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
-               self.L, self.phi, self.psi, self.max_order, self.out_type)
-        #BINYAMIN - END CHANGE
+        if self.model_kind == 'scattering':
+            S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
+                             self.L, self.phi, self.psi, self.max_order, self.out_type, downsample=self.downsample)
+        elif self.model_kind == 'invertible_scattering':
+            S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
+                                       self.L, self.phi, self.psi, self.max_order, self.out_type, downsample=self.downsample)
 
         if self.out_type == 'array':
             scattering_shape = S.shape[-3:]

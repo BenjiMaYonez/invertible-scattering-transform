@@ -4,10 +4,10 @@ class ScatteringNumPy:
     def __init__(self):
         self.frontend_name = 'numpy'
 
-    def __call__(self, x):
+    def __call__(self, x, downsample=True):
         """This method is an alias for `scattering`."""
 
-        return self.scattering(x)
+        return self.scattering(x, downsample=downsample)
 
     _doc_array = 'np.ndarray'
     _doc_array_n = 'n'

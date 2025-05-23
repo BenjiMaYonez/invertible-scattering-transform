@@ -5,10 +5,10 @@ from .base_frontend import ScatteringBase2D
 
 class ScatteringTensorFlow2D(ScatteringTensorFlow, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='tensorflow', name='Scattering2D', out_type='array'):
+            backend='tensorflow', name='Scattering2D', out_type='array', downsample=True):
         ScatteringTensorFlow.__init__(self, name)
         ScatteringBase2D.__init__(self, J, shape, L, max_order, pre_pad,
-                backend, out_type)
+                backend, out_type, downsample=downsample)
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
         ScatteringBase2D.build(self)
         ScatteringBase2D.create_filters(self)

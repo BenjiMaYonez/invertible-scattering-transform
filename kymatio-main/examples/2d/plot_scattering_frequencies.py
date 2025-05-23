@@ -63,7 +63,7 @@ def visualize_frequencies(image, depth, coeff_idx, image_idx):
 
 if __name__ == "__main__":
 
-    img_name = os.path.join(os.getcwd(), "kymatio-main\examples\\2d\images\digit.png")
+    img_name = os.path.join(os.getcwd(),"kymatio-main","examples","2d","images","digit.png")
 
     ####################################################################
     # Scattering computations
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     L = 8
     J = 3
     max_order = 3
-    scattering = Scattering2D(J=J, shape=images[0].shape, L=L, max_order=max_order, frontend='torch', out_type="list", model_kind='invertible_scattering')
+    scattering = Scattering2D(J=J, shape=images[0].shape, L=L, max_order=max_order, frontend='torch', out_type="list", model_kind='invertible_scattering',downsample=False)
 
     ####################################################################
     # We now compute the scattering coefficients:
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     selected_indices = [0,1,2]
     for image_idx , image in enumerate(images):
         coefficients = []
-        scat_coeffs = scattering(image)
+        scat_coeffs = scattering(image, downsample=False)
         i = 0
         for coeff in scat_coeffs:
             if coeff['depth'] == max_order:

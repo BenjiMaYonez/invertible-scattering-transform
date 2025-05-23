@@ -10,12 +10,12 @@ from ...scattering2d.core.scattering2d import invertibleScattering2d
 
 class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='torch', out_type='array', model_kind='scattering'):
+            backend='torch', out_type='array', model_kind='scattering', downsample=True):
         ScatteringTorch.__init__(self)
         ScatteringBase2D.__init__(**locals())
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
         ScatteringBase2D.build(self)
-        ScatteringBase2D.create_filters(self)
+        ScatteringBase2D.create_filters(self, downsample=downsample)
 
         if pre_pad:
             # Need to cast to complex in Torch
@@ -24,7 +24,7 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
         self.register_filters()
 
     def register_single_filter(self, v, n):
-        current_filter = torch.from_numpy(v).unsqueeze(-1)
+        current_filter = torch.from_numpy(v).unsqueeze(-1).contiguous()
         self.register_buffer('tensor' + str(n), current_filter)
         return current_filter
 
@@ -72,7 +72,7 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
 
         return phis, psis
 
-    def scattering(self, input):
+    def scattering(self, input, downsample=True):
         if not torch.is_tensor(input):
             raise TypeError('The input should be a PyTorch Tensor.')
 
@@ -102,11 +102,11 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
         #old code
         if self.model_kind == 'scattering':
             S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                                    self.L, phi, psi, self.max_order, self.out_type)
+                                    self.L, phi, psi, self.max_order, self.out_type, downsample=downsample)
         #new code
         elif self.model_kind == 'invertible_scattering':
             S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                            self.L, phi, psi, self.max_order, self.out_type)
+                            self.L, phi, psi, self.max_order, self.out_type, downsample=downsample)
         else:
             raise RuntimeError(f"got model_kind = {self.model_kind}, can only be scattering or invertible_scattering")
         #BINYAMIN - END CHANGE

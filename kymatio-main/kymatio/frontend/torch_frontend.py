@@ -1,7 +1,6 @@
 import torch.nn as nn
 
 class ScatteringTorch(nn.Module):
-    #TODO - cahnge this?
     def __init__(self):
         super(ScatteringTorch, self).__init__()
         self.frontend_name = 'torch'
@@ -11,12 +10,12 @@ class ScatteringTorch(nn.Module):
         saving those arrays as module buffers. """
         raise NotImplementedError
 
-    def forward(self, x):
+    def forward(self, x, downsample=True):
         """This method is an alias for `scattering`."""
 
         self.backend.input_checks(x)
 
-        return self.scattering(x)
+        return self.scattering(x, downsample=downsample)
 
     _doc_array = 'torch.Tensor'
     _doc_array_n = ''

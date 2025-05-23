@@ -1,5 +1,5 @@
 def scattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
-        out_type='array'):
+        out_type='array', downsample=True):
     subsample_fourier = backend.subsample_fourier
     modulus = backend.modulus
     rfft = backend.rfft
@@ -17,7 +17,8 @@ def scattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
     # First low pass filter
     U_1_c = cdgmm(U_0_c, phi['levels'][0])
-    U_1_c = subsample_fourier(U_1_c, k=2 ** J)
+    if downsample:
+        U_1_c = subsample_fourier(U_1_c, k=2 ** J)
 
     S_0 = irfft(U_1_c)
     S_0 = unpad(S_0)
@@ -32,7 +33,7 @@ def scattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
         theta1 = psi[n1]['theta']
 
         U_1_c = cdgmm(U_0_c, psi[n1]['levels'][0])
-        if j1 > 0:
+        if downsample and j1 > 0:
             U_1_c = subsample_fourier(U_1_c, k=2 ** j1)
         U_1_c = ifft(U_1_c)
         U_1_c = modulus(U_1_c)
@@ -40,7 +41,8 @@ def scattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
         # Second low pass filter
         S_1_c = cdgmm(U_1_c, phi['levels'][j1])
-        S_1_c = subsample_fourier(S_1_c, k=2 ** (J - j1))
+        if downsample:
+            S_1_c = subsample_fourier(S_1_c, k=2 ** (J - j1))
 
         S_1_r = irfft(S_1_c)
         S_1_r = unpad(S_1_r)
@@ -60,14 +62,16 @@ def scattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
                 continue
 
             U_2_c = cdgmm(U_1_c, psi[n2]['levels'][j1])
-            U_2_c = subsample_fourier(U_2_c, k=2 ** (j2 - j1))
+            if downsample:
+                U_2_c = subsample_fourier(U_2_c, k=2 ** (j2 - j1))
             U_2_c = ifft(U_2_c)
             U_2_c = modulus(U_2_c)
             U_2_c = rfft(U_2_c)
 
             # Third low pass filter
             S_2_c = cdgmm(U_2_c, phi['levels'][j2])
-            S_2_c = subsample_fourier(S_2_c, k=2 ** (J - j2))
+            if downsample:
+                S_2_c = subsample_fourier(S_2_c, k=2 ** (J - j2))
 
             S_2_r = irfft(S_2_c)
             S_2_r = unpad(S_2_r)
@@ -206,7 +210,7 @@ from kymatio.scattering2d.backend import numpy_backend
 
 
 def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
-        out_type='array'):
+        out_type='array', downsample=True):
     subsample_fourier = backend.subsample_fourier
     modulus = backend.modulus
     rfft = backend.rfft
@@ -229,7 +233,8 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
     # First low pass filter
     U_1_c = cdgmm(U_0_c, phi['levels'][0])#<F(x), F(father)>
-    U_1_c = subsample_fourier(U_1_c, k=2 ** J)
+    if downsample:
+        U_1_c = subsample_fourier(U_1_c, k=2 ** J)
 
     #changed from ifft to irfft for the output to be real valued
     S_0 = irfft(U_1_c)
@@ -243,7 +248,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
                     'depth' : 0})
     
 
-    recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, 1 ,None, out_type, out_S)
+    recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, 1 ,None, out_type, out_S, downsample)
     # print("out_s.len : %d \n" %len(out_S) )
     if out_type == 'array':
         out_S = stack1([x['coef'] for x in out_S])
@@ -254,7 +259,7 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
 
 def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, level, last_n,
-        out_type, out_S):
+        out_type, out_S, downsample=True):
     
     if level > max_order:
         return
@@ -286,7 +291,8 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
 
 
         U_1_c = cdgmm(U_0_c, psi[n1]['levels'][last_j])#< F(x) , F(mother_n1) >
-        U_1_c = subsample_fourier(U_1_c, k=2 ** (j1 - last_j))
+        if downsample:
+            U_1_c = subsample_fourier(U_1_c, k=2 ** (j1 - last_j))
         U_1_c = ifft(U_1_c)# x * mother_n1
         positive_real_U1, positive_imag_U1, neg_real_U1, neg_imag_U1 = custom_relu_split(U_1_c)
         
@@ -297,7 +303,8 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
 
         # Second low pass filter
         S_1 = [cdgmm(signal, phi['levels'][j1]) for signal in U_1]
-        S_1 = [subsample_fourier(signal, k=2 ** (J - j1)) for signal in S_1]
+        if downsample:
+            S_1 = [subsample_fourier(signal, k=2 ** (J - j1)) for signal in S_1]
         #changed from ifft to irfft for the output to be real valued
         S_1 = [irfft(signal) for signal in S_1]
         #S_1 = [ifft(signal) for signal in S_1]
@@ -312,7 +319,7 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
                             'depth' : level})
         
         for U_1_c in U_1:
-            recursiveInvertibleScattering2d(U_1_c, pad, unpad, backend, J, L, phi, psi, max_order, level+1, n1, out_type, out_S)
+            recursiveInvertibleScattering2d(U_1_c, pad, unpad, backend, J, L, phi, psi, max_order, level+1, n1, out_type, out_S, downsample)
 
 
 
