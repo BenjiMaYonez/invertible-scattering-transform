@@ -5,6 +5,7 @@ from ...scattering2d.core.scattering2d import scattering2d
 from ...frontend.torch_frontend import ScatteringTorch
 #BINYAMIN - START CHANGE
 from ...scattering2d.core.scattering2d import invertibleScattering2d
+from ...scattering2d.core.scattering2d import InverseScattering2D
 #BINYAMIN - END CHANGE
 
 
@@ -132,6 +133,20 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
                 x['coef'] = x['coef'].reshape(new_shape)
 
         return S
+    
+    def inverse_scattering(self, input, last_layer=None):
+        #TODO: check input shape (coefficients shape)
+
+
+        if not self.out_type in ('array', 'list'):
+            raise RuntimeError("The out_type must be one of 'array' or 'list'.")
+
+        phi, psi = self.load_filters()
+
+        x = InverseScattering2D(input, self.J, self.L, self.max_order, phi, psi,
+                        self.backend, self.out_type, last_layer)
+
+        return x
 
 
 ScatteringTorch2D._document()

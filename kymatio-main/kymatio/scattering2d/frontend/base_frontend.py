@@ -40,6 +40,9 @@ class ScatteringBase2D(ScatteringBase):
     def scattering(self, x):
         """ This function should call the functional scattering."""
         raise NotImplementedError
+    
+    def inverse_scattering(self, input, last_layer=None): 
+        raise NotImplementedError
 
     @property
     def M(self):

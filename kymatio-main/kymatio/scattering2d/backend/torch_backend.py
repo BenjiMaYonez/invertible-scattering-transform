@@ -240,6 +240,63 @@ class TorchBackend2D(TorchBackend):
             result.append(signal)
 
         return tuple(result)
+    
+    @classmethod
+    def conjugate_transpose(cls, x):
+        """Conjugate transpose of a complex tensor.
+
+            Parameters
+            ----------
+            x : tensor with the last dimension of size 2,
+                x[..., 0] is the real part and x[..., 1] is the imaginary part
+
+            Returns
+            -------
+            x : tensor
+                Conjugate transposed tensor.
+
+        """
+        if torch.is_complex(x):
+            return x.conj().transpose(-2, -1)
+        elif x.ndim == 4 and x.shape[-1] == 2:
+            # Conjugate transpose for real and imaginary parts
+            real_part = x[..., 0]
+            imag_part = x[..., 1]
+            conj_transpose_real_part = real_part.transpose(-2, -1)
+            conj_transpose_imag_part = -imag_part.transpose(-2, -1)
+
+            # Stack the conjugate real and imaginary parts
+            return torch.stack((conj_transpose_real_part, conj_transpose_imag_part), dim=-1)
+        else:
+            raise ValueError("Input tensor must be complex or have the last dimension of size 2.")
+    
+    @classmethod
+    def custom_relu_unsplit(cls , relu_real, relu_imag, relu_neg_real, relu_neg_imag):
+        # Combine positive and negative parts 
+        real_part = relu_real - relu_neg_real
+        imag_part = relu_imag - relu_neg_imag
+
+        # Combine the real and imaginary parts into a complex tensor
+        result = torch.stack((real_part, imag_part), dim=-1)
+
+        return result
+    
+    @classmethod
+    def zero_coeff(cls, shape):
+        """Creates a tensor of zeros with the given shape.
+
+            Parameters
+            ----------
+            shape : tuple
+                Shape of the output tensor.
+
+            Returns
+            -------
+            torch.zeros(shape) : tensor
+                Tensor of zeros with the given shape.
+
+        """
+        return torch.zeros(shape, dtype=torch.float32)
     #BINYAMIN - END CHNAGE
 
 
