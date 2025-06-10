@@ -40,9 +40,9 @@ if __name__ == "__main__":
 
     # Step 2: Compute scattering coefficients
     L = 2
-    J = 3
+    J = 4
     max_order = 3
-    scattering = Scattering2D(J=J, shape=images[0].shape, L=L, max_order=max_order, frontend='torch', out_type="list", model_kind='invertible_scattering',downsample=False)
+    scattering = Scattering2D(J=J, shape=images[0].shape, L=L, max_order=max_order, frontend='torch', out_type="list", model_kind='invertible_scattering',downsample=False, dilation_optimization=False)
 
     ####################################################################
     # We now compute the scattering coefficients:
@@ -57,6 +57,13 @@ if __name__ == "__main__":
         coefficients = []
         scat_coeffs = scattering(image, downsample=False) 
                    
+        
+        lst = []
+        # for coeff in scat_coeffs:
+            #if coeff['depth'] == 2:
+                #lst.append(coeff['coef'])
+            # print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'])    
+
         reconstructed_image = scattering.inverse_scattering(scat_coeffs,last_layer=None)
 
         ####################################################################

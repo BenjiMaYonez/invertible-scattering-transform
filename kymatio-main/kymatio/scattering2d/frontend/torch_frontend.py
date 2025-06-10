@@ -11,7 +11,7 @@ from ...scattering2d.core.scattering2d import InverseScattering2D
 
 class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='torch', out_type='array', model_kind='scattering', downsample=True):
+            backend='torch', out_type='array', model_kind='scattering', downsample=True, dilation_optimization=True):
         ScatteringTorch.__init__(self)
         ScatteringBase2D.__init__(**locals())
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
@@ -103,11 +103,11 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
         #old code
         if self.model_kind == 'scattering':
             S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                                    self.L, phi, psi, self.max_order, self.out_type, downsample=downsample)
+                                    self.L, phi, psi, self.max_order, self.out_type, downsample=downsample, dilation_optimization=self.dilation_optimization)
         #new code
         elif self.model_kind == 'invertible_scattering':
             S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                            self.L, phi, psi, self.max_order, self.out_type, downsample=downsample)
+                            self.L, phi, psi, self.max_order, self.out_type, downsample=downsample, dilation_optimization=self.dilation_optimization)
         else:
             raise RuntimeError(f"got model_kind = {self.model_kind}, can only be scattering or invertible_scattering")
         #BINYAMIN - END CHANGE
@@ -144,7 +144,7 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
         phi, psi = self.load_filters()
 
         x = InverseScattering2D(input, self.J, self.L, self.max_order, phi, psi,
-                        self.backend, self.out_type, last_layer)
+                        self.backend, self.out_type, last_layer, dilation_optimization= self.dilation_optimization)
 
         return x
 

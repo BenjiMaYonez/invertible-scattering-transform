@@ -6,15 +6,15 @@ import numpy as np
 
 class ScatteringNumPy2D(ScatteringNumPy, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='numpy', out_type='array', downsample=True):
+            backend='numpy', out_type='array', downsample=True, dilation_optimization=True):
         ScatteringNumPy.__init__(self)
         ScatteringBase2D.__init__(self, J, shape, L, max_order, pre_pad,
-                backend, out_type, downsample=downsample)
+                backend, out_type, downsample=downsample, dilation_optimization=dilation_optimization)
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
         ScatteringBase2D.build(self)
         ScatteringBase2D.create_filters(self, downsample=downsample)
 
-    def scattering(self, input):
+    def scattering(self, input, downsample=True):
         self.backend.input_checks(input)
 
         if len(input.shape) < 2:
@@ -37,10 +37,12 @@ class ScatteringNumPy2D(ScatteringNumPy, ScatteringBase2D):
 
         if self.model_kind == 'scattering':
             S = scattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                             self.L, self.phi, self.psi, self.max_order, self.out_type, downsample=self.downsample)
+                             self.L, self.phi, self.psi, self.max_order, self.out_type,
+                             downsample=downsample, dilation_optimization=self.dilation_optimization)
         elif self.model_kind == 'invertible_scattering':
             S = invertibleScattering2d(input, self.pad, self.unpad, self.backend, self.J,
-                                       self.L, self.phi, self.psi, self.max_order, self.out_type, downsample=self.downsample)
+                                       self.L, self.phi, self.psi, self.max_order, self.out_type,
+                                       downsample=downsample, dilation_optimization=self.dilation_optimization)
 
         if self.out_type == 'array':
             scattering_shape = S.shape[-3:]

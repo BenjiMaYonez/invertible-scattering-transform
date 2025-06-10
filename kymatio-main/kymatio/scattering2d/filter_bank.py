@@ -2,7 +2,7 @@ import numpy as np
 from scipy.fft import fft2, ifft2
 
 
-def filter_bank(M, N, J, L=8, downsample=True):
+def filter_bank(M, N, J, L=8, downsample=True, dilation_optimization=True):
     """
         Builds in Fourier the Morlet filters used for the scattering transform.
         Each single filter is provided as a dictionary with the following keys:
@@ -16,6 +16,13 @@ def filter_bank(M, N, J, L=8, downsample=True):
             logscale of the scattering
         L : int, optional
             number of angles used for the wavelet transform
+        downsample : bool, optional
+            If True, the filters are cropped to the size of the
+            downsampled signal at each resolution.
+        dilation_optimization : bool, optional
+            If True, the filters are designed to be used with dilation
+            optimization. If False, the filters are designed to be used
+            without dilation optimization.
         Returns
         -------
         filters : list
@@ -37,7 +44,7 @@ def filter_bank(M, N, J, L=8, downsample=True):
             psi_signal_fourier = np.real(fft2(psi_signal))
             # drop the imaginary part, it is zero anyway
             psi_levels = []
-            for res in range(min(j + 1, max(J - 1, 1))):
+            for res in range(min(j + 1, max(J - 1, 1))) if dilation_optimization else range(J):
                 if downsample:
                     psi_levels.append(periodize_filter_fft(psi_signal_fourier, res))
                 else:

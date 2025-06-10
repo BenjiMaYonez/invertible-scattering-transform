@@ -1,7 +1,7 @@
 import math
 
 def scattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
-        out_type='array', downsample=True):
+        out_type='array', downsample=True, dilation_optimization=True):
     subsample_fourier = backend.subsample_fourier
     modulus = backend.modulus
     rfft = backend.rfft
@@ -212,7 +212,7 @@ from kymatio.scattering2d.backend import numpy_backend
 
 
 def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
-        out_type='array', downsample=True):
+        out_type='array', downsample=True, dilation_optimization=True):
     subsample_fourier = backend.subsample_fourier
     modulus = backend.modulus
     rfft = backend.rfft
@@ -243,15 +243,16 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
     #S_0 = ifft(U_1_c)# F^-1(<F(x), F(father)>)  = x * father
     S_0 = unpad_cmplx(unpad,S_0)
 
-    out_S.append({'coef': S_0,
-                    'j': (),
-                    'n': (),
-                    'theta': (), 
+    out_S.append({'coef': S_0.contiguous(),
+                    'j': -1,
+                    'n': -1,
+                    'theta': -1, 
                     'depth' : 0,
+                    'path' : (),
                     'split' : 'no_split'})
     
 
-    recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, 1 ,None, out_type, out_S, downsample)
+    recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, 1 ,None, () ,out_type, out_S, downsample, dilation_optimization)
     # print("out_s.len : %d \n" %len(out_S) )
     if out_type == 'array':
         out_S = stack1([x['coef'] for x in out_S])
@@ -261,8 +262,8 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
 
 
 
-def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, level, last_n,
-        out_type, out_S, downsample=True):
+def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, level, last_n, path,
+        out_type, out_S, downsample=True, dilation_optimization=True):
     
     if level > max_order:
         return
@@ -290,7 +291,7 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
         else:
             last_j = psi[last_n]['j']
 
-        if j1 <= last_j and last_n != None:
+        if j1 <= last_j and last_n != None and dilation_optimization:
             continue
 
 
@@ -309,7 +310,7 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
 
         
 
-        # Second low pass filter
+        # low pass filter
         S_1 = {k: cdgmm(v, phi['levels'][j1]) for k,v in U_1.items()}
         if downsample:
             S_1 = {k: subsample_fourier(v, k=2 ** (J - j1)) for k,v in S_1.items()}
@@ -317,28 +318,51 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
         S_1 = {k: irfft(v) for k,v in S_1.items()}
         S_1 = {k: unpad_cmplx(unpad,v) for k,v in S_1.items()}
 
-
+        split_order = {'re_pos': 0, 'im_pos': 1, 're_neg': 2, 'im_neg': 3, 'no_split': 4}
         for key,signal in S_1.items():
-            out_S.append({'coef': signal,
-                            'j': (j1,),
-                            'n': (n1,),
-                            'theta': (theta1,), 
+            new_path = path + (n1,split_order[key])
+            out_S.append({'coef': signal.contiguous(),
+                            'j': j1,
+                            'n': n1,
+                            'theta': theta1, 
                             'depth' : level,
+                            'path' : new_path,
                             'split' : key})
         
-        for U_1_c in U_1.values():
-            recursiveInvertibleScattering2d(U_1_c, pad, unpad, backend, J, L, phi, psi, max_order, level+1, n1, out_type, out_S, downsample)
+        for key,U_1_c in U_1.items():
+            new_path = path + (n1,split_order[key])
+            recursiveInvertibleScattering2d(U_1_c, pad, unpad, backend, J, L, phi, psi, max_order, level+1, n1, new_path, out_type, out_S, downsample, dilation_optimization)
 
-def num_of_scattering_coefficients(max_depth, J, L):
+def num_of_scattering_coefficients(max_depth, J, L, dilation_optimization=True):
     total_sum = 0
     for q in range(0, max_depth + 1):
-        combination = math.comb(J, q)
+        if dilation_optimization:
+            combination = math.comb(J, q)
+        else:
+            combination = J ** q
         term = combination * (4 ** q) * (L ** q)
         total_sum += term
     return total_sum
 
-def num_of_scattering_coefficients_in_layer(layer_depth, J, L):
+def num_of_scattering_coefficients_in_layer(layer_depth, J, L, dilation_optimization=True):
+    if dilation_optimization:
         return math.comb(J, layer_depth) * (4 ** layer_depth) * (L ** layer_depth)
+    else:
+        return (J ** layer_depth) * (4 ** layer_depth) * (L ** layer_depth)
+
+def num_of_childrens(coeff, J , L, dilation_optimization=True):
+    """
+    Returns the number of direct childrens under the node corresponding to the coefficient.
+    every path in the scattering transform is of the form:
+    (f*mother_(j_1,theta_1))_i1)*(mother_(j_2,theta_2))_i2)*...*(mother_(j_k,theta_k))_ik
+    wherre 0<= j_1 < j_2 < ... < j_k < J are the scales and theta_m are angels in [0, L-1].
+    and i_m represent the split type of the coefficient at that scale (i.e. re_pos, im_pos, re_neg, im_neg, no_split),
+    """
+    if dilation_optimization and coeff['depth'] > 0:
+        return L*len(range(coeff['j']+1, J))
+    else:
+        return L*J
+    
 
 def sort_coefficients(coefficients):
     """
@@ -349,16 +373,16 @@ def sort_coefficients(coefficients):
     return sorted(
         coefficients,
         key=lambda x: (
-            x['depth'],
-            x['n'],
-            split_order.get(x['split'], 5)  # 5 for any unexpected value
+            x['depth']
+            #reversed(x['path']),
+            #split_order.get(x['split'], 5)  # 5 for any unexpected value
         )
     )
 
 
 
 def build_zero_last_layer(coefficients, J, L, max_order, phi, psi,
-                        backend, out_type='array'):
+                        backend, out_type='array', dilation_optimization=True):
     """
     Build the intermediate nodes computed in the last layer of the scattering
         transform as all zero.
@@ -391,29 +415,35 @@ def build_zero_last_layer(coefficients, J, L, max_order, phi, psi,
 
     out_S = []
     S_0 = backend.zero_coeff(coefficients[-1]['coef'].shape)
-    num_of_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L)
+    num_of_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L, dilation_optimization=dilation_optimization)
     num_of_coeffs = len(coefficients)
+    coefficients_in_last_layer = coefficients[num_of_coeffs - num_of_coeffs_in_last_layer : num_of_coeffs]
 
-    for i in range(num_of_coeffs - num_of_coeffs_in_last_layer, num_of_coeffs, num_of_coeffs):
-        if coefficients[i]['depth'] != max_order:
+    for coeff in coefficients_in_last_layer:
+        if coeff['depth'] != max_order:
             raise RuntimeError('Wrong calculation of number of coeffs in the last layer')
         
         for n in range(len(psi)):
             j = psi[n]['j']
             theta = psi[n]['theta']
-        
+
+            if dilation_optimization and coeff['j'] >= j:#scale j must go down in each layer
+                continue
+            
             out_S.append({'coef': S_0,
-                        'j': j,
-                        'n': n,
-                        'theta': theta,
-                        'depth' : max_order+1,
-                        'split' : coefficients[i]['split']}) 
+                'j': j,
+                'n': n,
+                'theta': theta,
+                'depth' : max_order+1,
+                'split' : coeff['split']}) 
+            
+        
     
     return out_S
 
 
 def InverseScattering2D(coefficients, J, L, max_order, phi, psi,
-                        backend, out_type='array', last_layer=None):
+                        backend, out_type='array', last_layer=None, dilation_optimization=True):
     """
     Inverse scattering function to reconstruct the image from coefficients.
     Parameters
@@ -446,19 +476,34 @@ def InverseScattering2D(coefficients, J, L, max_order, phi, psi,
         transform. i.e olnly convolution with mother filters (U_1_c).
         If None, zero is used.
     """
+    #TODO -- implement inversion in this edge case.
+    # one possible solution is to take the second to last coefficients and compute from them.
+    if max_order >= J:
+        raise RuntimeError('max_order must be less than J-1, max_order = %d, J-1 = %d' % (max_order, J-1))
+    
+
     #sort coefficiants for efficincy
     coefficients = sort_coefficients(coefficients)
+    sorted_coefficients_by_path = coefficients.copy()
+    sorted_coefficients_by_path.sort(key=lambda x: (x['depth'],x['path']))
+    for i in range(len(sorted_coefficients_by_path)):
+        if sorted_coefficients_by_path[i]['path'] != coefficients[i]['path']:
+            raise RuntimeError('Sorting by path failed, the paths are not equal')
+    
+    for coeff in coefficients:
+            print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'])    
+
 
     if last_layer == None:
-     last_layer = build_zero_last_layer(coefficients, J, L, max_order, phi, psi, backend, out_type='array') 
+     last_layer = build_zero_last_layer(coefficients, J, L, max_order, phi, psi, backend, out_type='array', dilation_optimization=dilation_optimization) 
 
     RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
-                                    backend, last_layer=last_layer)
+                                    backend, last_layer=last_layer, dilation_optimization=dilation_optimization)
 
 
 
 def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
-                        backend, last_layer):
+                        backend, last_layer, dilation_optimization=True):
     
     subsample_fourier = backend.subsample_fourier
     modulus = backend.modulus
@@ -488,15 +533,19 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
     #using F^-1(<F(c), F(father_n1^H)>)
     #----------------------------------
 
-    num_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L)
+    num_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L, dilation_optimization=dilation_optimization)    
     num_coeffs = len(coefficients)
     last_coeffs = coefficients[num_coeffs - num_coeffs_in_last_layer : num_coeffs]
 
     reconstructed_nodes_splited = []
-    for (coeff,i) in zip(last_coeffs, range(0,num_coeffs_in_last_layer,len(psi))):# i is the index of the first node in the last layer that corresponds to coeff
+    i = 0
+    for coeff in last_coeffs:
         reconstructed_node = ifft(cdgmm(fft(coeff['coef']), conjugate_transpose(phi['levels'][coeff['j']])))#F^-1(<F(c), F(father^H)>)
         
-        corresponding_intermediate_nodes = last_layer[i:i+len(psi)]#TODO:  i must jump by len(psi)
+        num_of_coeff_childrens = num_of_childrens(coeff,J,L, dilation_optimization)
+        corresponding_intermediate_nodes = last_layer[i:i+num_of_coeff_childrens]
+        i += num_of_coeff_childrens
+
         for (node, j) in zip(corresponding_intermediate_nodes, range(len(psi))):
             j1 = psi[j]['j']
             theta1 = psi[j]['theta']
@@ -520,7 +569,7 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
                                     'split' : 'no_split'})
     
     return RecursiveInverseScattering2D(coefficients[0:num_coeffs - num_coeffs_in_last_layer], J, L, max_order-1, phi, psi,
-                        backend, last_layer=reconstructed_nodes)
+                        backend, last_layer=reconstructed_nodes, dilation_optimization=dilation_optimization)
 
 
     

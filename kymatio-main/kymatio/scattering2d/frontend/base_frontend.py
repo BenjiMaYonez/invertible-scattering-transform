@@ -6,7 +6,7 @@ from ..utils import compute_padding
 
 class ScatteringBase2D(ScatteringBase):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend=None, out_type='array', model_kind='scattering', downsample=True):
+            backend=None, out_type='array', model_kind='scattering', downsample=True, dilation_optimization=True):
         super(ScatteringBase2D, self).__init__()
         self.pre_pad = pre_pad
         self.L = L
@@ -17,6 +17,7 @@ class ScatteringBase2D(ScatteringBase):
         self.out_type = out_type
         self.model_kind = model_kind
         self.downsample = downsample
+        self.dilation_optimization = dilation_optimization
 
     def build(self):
         M, N = self.shape
@@ -34,7 +35,7 @@ class ScatteringBase2D(ScatteringBase):
         self.unpad = self.backend.unpad
 
     def create_filters(self, downsample=True):
-        filters = filter_bank(self._M_padded, self._N_padded, self.J, self.L, downsample=downsample)
+        filters = filter_bank(self._M_padded, self._N_padded, self.J, self.L, downsample=downsample, dilation_optimization=self.dilation_optimization)
         self.phi, self.psi = filters['phi'], filters['psi']
 
     def scattering(self, x):
