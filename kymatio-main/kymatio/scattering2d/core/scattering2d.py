@@ -412,9 +412,11 @@ def build_zero_last_layer(coefficients, J, L, max_order, phi, psi,
         concatenation of all scattering coefficients. Defaults to
         `'array'`.  
     """
+    from_real_to_complex = backend.from_real_to_complex
+    zero_coeff = backend.zero_coeff
 
     out_S = []
-    S_0 = backend.zero_coeff(coefficients[-1]['coef'].shape)
+    S_0 = from_real_to_complex(zero_coeff(coefficients[-1]['coef'].shape))
     num_of_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L, dilation_optimization=dilation_optimization)
     num_of_coeffs = len(coefficients)
     coefficients_in_last_layer = coefficients[num_of_coeffs - num_of_coeffs_in_last_layer : num_of_coeffs]
@@ -435,14 +437,15 @@ def build_zero_last_layer(coefficients, J, L, max_order, phi, psi,
                 'n': n,
                 'theta': theta,
                 'depth' : max_order+1,
-                'split' : coeff['split']}) 
+                'split' : coeff['split']
+                })
             
         
     
     return out_S
 
 
-def InverseScattering2D(coefficients, J, L, max_order, phi, psi,
+def InverseScattering2D(coefficients, J, L, max_order, phi, psi, pad , unpad,
                         backend, out_type='array', last_layer=None, dilation_optimization=True):
     """
     Inverse scattering function to reconstruct the image from coefficients.
@@ -476,6 +479,9 @@ def InverseScattering2D(coefficients, J, L, max_order, phi, psi,
         transform. i.e olnly convolution with mother filters (U_1_c).
         If None, zero is used.
     """
+    from_real_to_complex = backend.from_real_to_complex
+    pad_cmplx = backend.pad_cmplx
+
     #TODO -- implement inversion in this edge case.
     # one possible solution is to take the second to last coefficients and compute from them.
     if max_order >= J:
@@ -491,7 +497,11 @@ def InverseScattering2D(coefficients, J, L, max_order, phi, psi,
             raise RuntimeError('Sorting by path failed, the paths are not equal')
     
     for coeff in coefficients:
-            print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'])    
+        #each coeff['coef'] is a real 2 dimensional array with shape (a,b)
+        #need to transform it to a complex array with shape (a,b,2)
+        coeff['coef'] = pad_cmplx(pad, from_real_to_complex(coeff['coef']))
+        
+        print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'], "shape: ", coeff['coef'].shape)    
 
 
     if last_layer == None:

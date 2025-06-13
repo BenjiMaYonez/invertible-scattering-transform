@@ -70,6 +70,11 @@ class Pad(object):
                 Complex torch tensor that has been padded.
 
         """
+        batch = True
+        if len(x.shape) < 3:#No batch dimension - adding batch dimension
+            batch = False
+            x = x.reshape((1,1) + x.shape)
+
         batch_shape = x.shape[:-2]
         signal_shape = x.shape[-2:]
         x = x.reshape((-1, 1) + signal_shape)
@@ -82,8 +87,11 @@ class Pad(object):
         if self.pad_size[2] == self.input_size[1]:
             x = torch.cat([x[:, :, :, 1].unsqueeze(3), x, x[:, :, :, x.shape[3] - 2].unsqueeze(3)], 3)
 
-        output = x.reshape(batch_shape + x.shape[-2:] + (1,))
-        return output
+        if batch:
+            return  x.reshape(batch_shape + x.shape[-2:] + (1,))
+        else:
+            return  x.reshape( x.shape[-2:] + (1,))
+  
 
 
 class TorchBackend2D(TorchBackend):
@@ -179,7 +187,7 @@ class TorchBackend2D(TorchBackend):
             padded_imag = pad(imag_part)
             return torch.view_as_real(torch.complex(padded_real, padded_imag))
         
-        if x.ndim == 4 and x.shape[-1] == 2: #x.shape = [n1,n2,...,nk,2]  last dimansion is real,cmplx
+        if (x.ndim == 4 or x.ndim == 3) and x.shape[-1] == 2: #x.shape = [n1,n2,...,nk,2]  last dimansion is real,cmplx
             real_part = x[...,0]
             imag_part = x[...,1]
             padded_real = pad(real_part)
@@ -201,7 +209,7 @@ class TorchBackend2D(TorchBackend):
             unpadded_imag = unpad(imag_part)
             return torch.view_as_real(torch.complex(unpadded_real, unpadded_imag))
         
-        if x.ndim == 4 and x.shape[-1] == 2:
+        if (x.ndim == 4 or x.ndim == 3 ) and x.shape[-1] == 2:
             real_part = x[...,0]
             imag_part = x[...,1]
             padded_real = unpad(real_part)
@@ -258,7 +266,8 @@ class TorchBackend2D(TorchBackend):
         """
         if torch.is_complex(x):
             return x.conj().transpose(-2, -1)
-        elif x.ndim == 4 and x.shape[-1] == 2:
+        elif x.ndim == 3:
+            if x.shape[-1] == 1 : x = backend.from_real_to_complex(x[...,0])
             # Conjugate transpose for real and imaginary parts
             real_part = x[..., 0]
             imag_part = x[..., 1]
@@ -297,6 +306,24 @@ class TorchBackend2D(TorchBackend):
 
         """
         return torch.zeros(shape, dtype=torch.float32)
+    
+    @classmethod
+    def from_real_to_complex(cls, x):
+        """Converts a real tensor to a complex tensor.
+
+            Parameters
+            ----------
+            x : tensor
+                Real tensor input.
+    
+            Returns 
+            -------
+            torch.stack((x, torch.zeros_like(x)), dim=-1) : tensor
+                Complex tensor with the real part as x and the imaginary part as zeros.
+
+        """
+        imaginary_part = torch.zeros_like(x)
+        return torch.stack((x, imaginary_part), dim=-1)
     #BINYAMIN - END CHNAGE
 
 

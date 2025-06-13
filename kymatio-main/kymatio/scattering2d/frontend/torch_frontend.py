@@ -143,7 +143,7 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
 
         phi, psi = self.load_filters()
 
-        x = InverseScattering2D(input, self.J, self.L, self.max_order, phi, psi,
+        x = InverseScattering2D(input, self.J, self.L, self.max_order, phi, psi, self.pad, self.unpad,
                         self.backend, self.out_type, last_layer, dilation_optimization= self.dilation_optimization)
 
         return x
