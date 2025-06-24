@@ -126,7 +126,7 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
             S = S.reshape(batch_shape + scattering_shape)
 
         else:
-            scattering_shape = S[0]['coef'].shape[-2:]
+            scattering_shape = S[0]['coef'].shape[-2:] if downsample else S[0]['coef'].shape[-3:]
             new_shape = batch_shape + scattering_shape
 
             for x in S:

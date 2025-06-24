@@ -32,7 +32,14 @@ class ScatteringBase2D(ScatteringBase):
         else:
             self.pad = lambda x: x
 
-        self.unpad = self.backend.unpad
+        # unpad is a no-op if pre_pad is True, otherwise it crops the padded input
+        if self.pre_pad:
+            self.unpad = lambda x: x
+        else:
+            self.unpad = self.backend.Unpad([(self._M_padded - M) // 2, (self._M_padded - M+1) // 2, (self._N_padded - N) // 2,
+                                (self._N_padded - N + 1) // 2], [M, N])
+
+        #self.unpad = self.backend.unpad
 
     def create_filters(self, downsample=True):
         filters = filter_bank(self._M_padded, self._N_padded, self.J, self.L, downsample=downsample, dilation_optimization=self.dilation_optimization)

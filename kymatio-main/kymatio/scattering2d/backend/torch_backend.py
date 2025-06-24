@@ -85,9 +85,68 @@ class Pad(object):
         output = x.reshape(batch_shape + x.shape[-2:] + (1,))
         return output
 
+class Unpad(object):
+    def __init__(self, pad_size, input_size):
+        """
+        Unpadding which reverses the effect of Pad (ReflectionPad2d).
+
+        Parameters
+        ----------
+        pad_size : list of 4 integers
+            Size of padding to remove [top, bottom, left, right].
+        input_size : list of 2 integers
+            Size of the original signal [height, width].
+        """
+        self.pad_size = pad_size
+        self.input_size = input_size
+
+    def __call__(self, x):
+        """
+        Removes padding from the input tensor.
+
+        Parameters
+        ----------
+        x : tensor
+            Padded tensor.
+
+        Returns
+        -------
+        output : tensor
+            Unpadded tensor.
+        """
+        # batch_shape = x.shape[:-3]
+        # cmplx_shape = x.shape[-1:]
+        # signal_shape = x.shape[-3:-1]
+
+        # x = x[-3:-1]
+
+
+        # # x shape: (..., H, W) or (..., H, W, C)
+        # top, bottom, left, right = self.pad_size
+        # # Remove padding: [top, bottom] from axis -2, [left, right] from axis -1
+        # h_start = top
+        # h_end = x.shape[0] - bottom
+        # w_start = left
+        # w_end = x.shape[1] - right
+        # x = x[h_start:h_end, w_start:w_end]
+
+        # return x.reshape(batch_shape + signal_shape + cmplx_shape)
+        left, right, top, bottom = self.pad_size
+       
+        x = x[
+            :,                                # n1
+            left : -right or None,            # n2
+            top  : -bottom or None,           # n3
+            :                                 # n4
+        ]
+        if x.shape[-1] == 1:
+            x = x.squeeze(-1)  # remove the last dim
+        return x
+
 
 class TorchBackend2D(TorchBackend):
     Pad = Pad
+    Unpad = Unpad
 
     @classmethod
     def subsample_fourier(cls, x, k):
@@ -133,6 +192,32 @@ class TorchBackend2D(TorchBackend):
     @staticmethod
     def _is_real(x):
         return x.shape[-1] == 1
+    
+    @classmethod
+    def from_real_to_complex(cls, x):
+        """Converts a real tensor to a complex tensor.
+
+            Parameters
+            ----------
+            x : tensor
+                Real tensor input.
+    
+            Returns 
+            -------
+            torch.stack((x, torch.zeros_like(x)), dim=-1) : tensor
+                Complex tensor with the real part as x and the imaginary part as zeros.
+
+        """
+        if x.ndim == 2: # x.shape = [n1,n2]
+            imaginary_part = torch.zeros_like(x)
+            return torch.stack((x, imaginary_part), dim=-1)
+        elif x.ndim > 2 and x.shape[-1] == 1:  # x.shape = [n1,n2,...,nk,1]
+            imaginary_part = torch.zeros_like(x)
+            return torch.cat((x, imaginary_part), dim=-1)  # x.shape = [n1,n2,...,nk,2]
+        elif x.ndim > 2 and x.shape[-1] == 2:  
+            return x  # already complex, no need to convert
+        else:
+            raise ValueError("Input tensor must be at least 2D and have the last dimension of size 1 or 2.")
 
     @classmethod
     def fft(cls, x):
@@ -258,7 +343,8 @@ class TorchBackend2D(TorchBackend):
         """
         if torch.is_complex(x):
             return x.conj().transpose(-2, -1)
-        elif x.ndim == 4 and x.shape[-1] == 2:
+        elif x.ndim >= 3:
+            if x.shape[-1] == 1: x = cls.from_real_to_complex(x)
             # Conjugate transpose for real and imaginary parts
             real_part = x[..., 0]
             imag_part = x[..., 1]
@@ -297,35 +383,38 @@ class TorchBackend2D(TorchBackend):
 
         """
         return torch.zeros(shape, dtype=torch.float32)
+    
+
     #BINYAMIN - END CHNAGE
 
 
-    @staticmethod
-    def unpad(in_):
-        """Unpads input.
+    # @classmethod
+    # def unpad(cls, in_):
+    #     """Unpads input.
 
-            Slices the input tensor at indices between 1:-1.
+    #         Slices the input tensor at indices between 1:-1.
 
-            Parameters
-            ----------
-            in_ : tensor
-                Input tensor.
+    #         Parameters
+    #         ----------
+    #         in_ : tensor
+    #             Input tensor.
 
-            Returns
-            -------
-            in_[..., 1:-1, 1:-1] : tensor
-                Output tensor.  Unpadded input.
+    #         Returns
+    #         -------
+    #         in_[..., 1:-1, 1:-1] : tensor
+    #             Output tensor.  Unpadded input.
 
-        """
-        #BINYAMIN - START CHANGE
-        #new version
-        #in_ = in_[..., 1:-1, 1:-1]
+    #     """
+    #     #BINYAMIN - START CHANGE
+    #     #new version
+    #     return Unpad(in_)
+
         
-        #old version
-        in_ = in_[..., 1:-1, 1:-1, :]
-        in_ = in_.reshape(in_.shape[:-1])
-        #BINYAMIN - END CHANGE
-        return in_
+    #     #old version
+    #     # in_ = in_[..., 1:-1, 1:-1, :]
+    #     # in_ = in_.reshape(in_.shape[:-1])
+    #     #BINYAMIN - END CHANGE
+        
 
     @staticmethod
     def stack(arrays):

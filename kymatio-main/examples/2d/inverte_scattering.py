@@ -5,7 +5,7 @@ import torch
 from torchvision import datasets, transforms
 from PIL import Image
 import os
-
+import matplotlib.pyplot as plt
 
 
 
@@ -54,41 +54,26 @@ if __name__ == "__main__":
 
     selected_indices = [0,1,2]
     for image_idx , image in enumerate(images):
+        plt.figure()
+        plt.title(f"Input Image {image_idx}")
+        plt.imshow(image.cpu().numpy(), cmap='gray')
+        plt.axis('off')
+        plt.show()
+
         coefficients = []
         scat_coeffs = scattering(image, downsample=False) 
                    
         
-        lst = []
-        # for coeff in scat_coeffs:
-            #if coeff['depth'] == 2:
-                #lst.append(coeff['coef'])
-            # print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'])    
-
+       
         reconstructed_image = scattering.inverse_scattering(scat_coeffs,last_layer=None)
+        reconstructed_image = reconstructed_image[...,0]
 
-        ####################################################################
-        # There are 127 scattering coefficients, among which 1 is low-pass, $JL=18$ are of first-order and $L^2(J(J-1)/2)=108$
-        # are of second-order. Due to the subsampling by $2^J=8$, the final spatial grid is of size $4\times4$.
-        # We now retrieve first-order and second-order coefficients for the display.
-        # len_order_1 = J*L
-        # scat_coeffs_order_1 = scat_coeffs[1:1+len_order_1, :, :]
-
-        # len_order_2 = (J*(J-1)//2)*(L**2)
-        # scat_coeffs_order_2 = scat_coeffs[1+len_order_1:, :, :]
-
-        # coefficients = scat_coeffs_order_2
-        #coefficients = scat_coeffs
-
-        # window_rows, window_columns = coefficients[0].shape
-
-        # num_coefficients = len(coefficients)
-        # print("Number of coefficients (channels):", num_coefficients)
-
-        # # For demonstration, let's select a few coefficients
-        # selected_indices = [0, num_coefficients // 2, num_coefficients - 1]  # First, middle, last coefficients
-
-        # # Step 4: Analyze each selected coefficient
-        # for idx in selected_indices:
-        #     coeff = coefficients[idx]
-        #     visualize_frequencies(coeff, max_order, idx)
+        # Plot the reconstructed image
+        plt.figure()
+        plt.title(f"Reconstructed Image {image_idx}")
+        # If reconstructed_image is a torch tensor, convert to numpy
+        img_to_plot = reconstructed_image.cpu().detach().numpy()
+        plt.imshow(img_to_plot, cmap='gray')
+        plt.axis('off')
+        plt.show()
 
