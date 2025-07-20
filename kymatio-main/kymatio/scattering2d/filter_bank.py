@@ -39,7 +39,7 @@ def filter_bank(M, N, J, L=8, downsample=True, dilation_optimization=True):
         for theta in range(L):
             psi = {'levels': [], 'j': j, 'theta': theta}
             psi_signal = morlet_2d(M, N, 0.8 * 2**j,
-                (int(L-L/2-1)-theta) * np.pi / L,
+                (int(L-L/2-1)-theta) * np.pi / L * 2, #yanglin add * 2, to have the frequency covered the whole range [0, 2pi]
                 3.0 / 4.0 * np.pi /2**j, 4.0/L)
             psi_signal_fourier = np.real(fft2(psi_signal))
             # drop the imaginary part, it is zero anyway

@@ -492,7 +492,12 @@ def RefacrorCoefficients(coefficients, J, L, max_order, phi, psi,
     print("sorted coefficients by path: \n")
     for coeff in coefficients:
             print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'])    
+<<<<<<< HEAD
 
+=======
+    # coefficients[0]['coef'] = backend.zero_coeff(coefficients[0]['coef'].shape)
+    # print(coefficients[0]['depth'])
+>>>>>>> master
     return coefficients
     # print("--------------------------------------------------")
     # print("coefficients refactoring: \n")
@@ -575,9 +580,10 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
     conjugate_transpose = backend.conjugate_transpose
     zero_coeff = backend.zero_coeff
 
-    if max_order == 0:
-        return coefficients[0]['coef']
-
+# yanglin delete
+    # if max_order == 0:
+    #     return coefficients[0]['coef']
+# yanglin delete end
     
     #Convolve each of the last layer nodes with the corresponding congugated and transposed mother filter
     #i.e: if the node y was of the form y=x*mother_n1 then computing y*mother_n1^H where H is the conjugate transpose
@@ -595,8 +601,8 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
     reconstructed_nodes_splited = []
     i = 0
     for coeff in last_coeffs:
-        reconstructed_node = ifft(cdgmm(fft(coeff['coef']), conjugate_transpose(phi['levels'][coeff['j']])))#F^-1(<F(c), F(father^H)>)
-        
+        #reconstructed_node = ifft(cdgmm(fft(coeff['coef']), conjugate_transpose(phi['levels'][0])))#F^-1(<F(c), F(father^H)>) # yanglin update
+        reconstructed_node = ifft(cdgmm(fft(coeff['coef']), phi['levels'][0]))#F^-1(<F(c), F(father^H)>) # yanglin update
         num_of_coeff_childrens = num_of_childrens(coeff,J,L, dilation_optimization)
         corresponding_intermediate_nodes = last_layer[i:i+num_of_coeff_childrens]
         i += num_of_coeff_childrens
@@ -604,18 +610,23 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
         for (node, j) in zip(corresponding_intermediate_nodes, range(len(psi))):
             j1 = psi[j]['j']
             theta1 = psi[j]['theta']
-            reconstructed_node += ifft(cdgmm(fft(node['coef']), conjugate_transpose(psi[j]['levels'][j1])))#F^-1(<F(c), F(mother^H)>)
-        
+            #reconstructed_node += ifft(cdgmm(fft(node['coef']), conjugate_transpose(psi[j]['levels'][0])))#F^-1(<F(c), F(mother^H)>) # yanglin update
+            reconstructed_node += ifft(cdgmm(fft(node['coef']), psi[j]['levels'][0]))#F^-1(<F(c), F(mother^H)>) # yanglin update
         reconstructed_nodes_splited.append({'coef': reconstructed_node,
                                     'j': coeff['j'],
                                     'n': coeff['n'],
                                     'theta': coeff['theta'],
                                     'depth' : coeff['depth'],
                                     'split' : coeff['split']})
-        
+    # yanglin add
+    if max_order == 0:
+        return reconstructed_node
+    # yanglin add end      
     reconstructed_nodes = []    
     for i in range(0,len(reconstructed_nodes_splited),4):
-        unified_node = custom_relu_unsplit(reconstructed_nodes_splited[i]['coef'][...,0], reconstructed_nodes_splited[i+1]['coef'][...,1], reconstructed_nodes_splited[i+2]['coef'][...,0], reconstructed_nodes_splited[i+3]['coef'][...,1])
+        #unified_node = custom_relu_unsplit(reconstructed_nodes_splited[i]['coef'][...,0], reconstructed_nodes_splited[i+1]['coef'][...,0], reconstructed_nodes_splited[i+2]['coef'][...,0], reconstructed_nodes_splited[i+3]['coef'][...,0]) # yanglin update
+        
+        unified_node = custom_relu_unsplit(reconstructed_nodes_splited[i]['coef'][...,1].relu(), reconstructed_nodes_splited[i+1]['coef'][...,1].relu(), reconstructed_nodes_splited[i+2]['coef'][...,1].relu(), reconstructed_nodes_splited[i+3]['coef'][...,1].relu()) # yanglin update
         reconstructed_nodes.append({'coef': unified_node,
                                     'j': reconstructed_nodes_splited[i]['j'],
                                     'n': reconstructed_nodes_splited[i]['n'],

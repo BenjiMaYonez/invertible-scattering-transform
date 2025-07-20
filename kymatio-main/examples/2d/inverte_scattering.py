@@ -58,14 +58,14 @@ if __name__ == "__main__":
         plt.title(f"Input Image {image_idx}")
         plt.imshow(image.cpu().numpy(), cmap='gray')
         plt.axis('off')
-        plt.show()
+        plt.savefig(f"input_image_{image_idx}.png")
+        plt.close()
 
         coefficients = []
-        scat_coeffs = scattering(image, downsample=False) 
-                   
+        scat_coeffs = scattering(image, downsample=False)
         
        
-        reconstructed_image = scattering.inverse_scattering(scat_coeffs,last_layer=None)
+        reconstructed_image = scattering.inverse_scattering(scat_coeffs)
         reconstructed_image = reconstructed_image[...,0]
 
         # Plot the reconstructed image
@@ -75,5 +75,27 @@ if __name__ == "__main__":
         img_to_plot = reconstructed_image.cpu().detach().numpy()
         plt.imshow(img_to_plot, cmap='gray')
         plt.axis('off')
-        plt.show()
+        plt.savefig(f"reconstructed_image_{image_idx}.png")
+        plt.close()
+        break
 
+import numpy as np
+fft = np.fft.fft2(img_to_plot)
+fft_shifted = np.fft.fftshift(fft)
+magnitude_spectrum = np.abs(fft_shifted)
+plt.figure()
+plt.title("Magnitude Spectrum")
+plt.imshow(np.log1p(magnitude_spectrum), cmap='gray')
+plt.axis('off')
+plt.savefig("magnitude_spectrum.png")
+plt.close()
+
+fft = np.fft.fft2(images[0])
+fft_shifted = np.fft.fftshift(fft)
+magnitude_spectrum = np.abs(fft_shifted)
+plt.figure()
+plt.title("Magnitude Spectrum")
+plt.imshow(np.log1p(magnitude_spectrum), cmap='gray')
+plt.axis('off')
+plt.savefig("original magnitude_spectrum.png")
+plt.close()
