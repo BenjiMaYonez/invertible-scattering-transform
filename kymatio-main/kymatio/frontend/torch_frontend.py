@@ -12,7 +12,7 @@ class ScatteringTorch(nn.Module):
 
     def forward(self, x, downsample=True):
         """This method is an alias for `scattering`."""
-
+        downsample = self.downsample
         self.backend.input_checks(x)
 
         return self.scattering(x, downsample=downsample)

@@ -575,9 +575,6 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
     conjugate_transpose = backend.conjugate_transpose
     zero_coeff = backend.zero_coeff
 
-    if max_order == 0:
-        return coefficients[0]['coef']
-
     
     #Convolve each of the last layer nodes with the corresponding congugated and transposed mother filter
     #i.e: if the node y was of the form y=x*mother_n1 then computing y*mother_n1^H where H is the conjugate transpose
@@ -592,10 +589,12 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
     num_coeffs = len(coefficients)
     last_coeffs = coefficients[num_coeffs - num_coeffs_in_last_layer : num_coeffs]
 
+
+##--------------  multiply the last layer nodes with the mother filters ----------------
     reconstructed_nodes_splited = []
     i = 0
     for coeff in last_coeffs:
-        reconstructed_node = ifft(cdgmm(fft(coeff['coef']), conjugate_transpose(phi['levels'][coeff['j']])))#F^-1(<F(c), F(father^H)>)
+        reconstructed_node = ifft(cdgmm(fft(coeff['coef']), (phi['levels'][coeff['j']])))#F^-1(<F(c), F(father^H)>)
         
         num_of_coeff_childrens = num_of_childrens(coeff,J,L, dilation_optimization)
         corresponding_intermediate_nodes = last_layer[i:i+num_of_coeff_childrens]
@@ -604,7 +603,7 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
         for (node, j) in zip(corresponding_intermediate_nodes, range(len(psi))):
             j1 = psi[j]['j']
             theta1 = psi[j]['theta']
-            reconstructed_node += ifft(cdgmm(fft(node['coef']), conjugate_transpose(psi[j]['levels'][j1])))#F^-1(<F(c), F(mother^H)>)
+            reconstructed_node += ifft(cdgmm(fft(node['coef']), (psi[j]['levels'][j1])))#F^-1(<F(c), F(mother^H)>)
         
         reconstructed_nodes_splited.append({'coef': reconstructed_node,
                                     'j': coeff['j'],
@@ -612,7 +611,10 @@ def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
                                     'theta': coeff['theta'],
                                     'depth' : coeff['depth'],
                                     'split' : coeff['split']})
-        
+##-----------------  apply relu unsplit to recollect every 4 nodes ----------------
+    if max_order == 0:
+        return reconstructed_nodes_splited[0]['coef']
+    
     reconstructed_nodes = []    
     for i in range(0,len(reconstructed_nodes_splited),4):
         unified_node = custom_relu_unsplit(reconstructed_nodes_splited[i]['coef'][...,0], reconstructed_nodes_splited[i+1]['coef'][...,1], reconstructed_nodes_splited[i+2]['coef'][...,0], reconstructed_nodes_splited[i+3]['coef'][...,1])
