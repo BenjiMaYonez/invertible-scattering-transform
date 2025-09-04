@@ -56,7 +56,8 @@ class InvertibleScatteringAdapter:
         self.spec = spec
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         kwargs = dict(J=spec.J, shape=(spec.H, spec.W), L=spec.L, max_order=spec.max_order)
-        self.scattering = Scattering2D(**kwargs, frontend='torch', out_type="list", model_kind='invertible_scattering',downsample=False, dilation_optimization=False)
+        spec.H , spec.W = 10,10
+        self.scattering = Scattering2D(J=3, L=2, shape=(10,10), max_order=2,frontend='torch', out_type="list", model_kind='invertible_scattering',downsample=False, dilation_optimization=False)
 
         try:
             self.scattering.to(self.device)
@@ -77,7 +78,7 @@ class InvertibleScatteringAdapter:
         # Try 2D input first, then 4D (B,C,H,W)
         for trial in range(2):
             try:
-                out_raw = self.scattering(x if trial == 0 else x.unsqueeze(0).unsqueeze(0))
+                out_raw = self.scattering( x, downsample=False)
                 break
             except Exception as e:
                 last_err = e

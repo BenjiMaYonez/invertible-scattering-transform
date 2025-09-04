@@ -359,8 +359,8 @@ class TorchBackend2D(TorchBackend):
     @classmethod
     def custom_relu_unsplit(cls , relu_real, relu_imag, relu_neg_real, relu_neg_imag):
         # Combine positive and negative parts 
-        real_part = relu_real - relu_neg_real
-        imag_part = relu_imag - relu_neg_imag
+        real_part = torch.relu(relu_real) - torch.relu(relu_neg_real)
+        imag_part = torch.relu(relu_imag) - torch.relu(relu_neg_imag)
 
         # Combine the real and imaginary parts into a complex tensor
         result = torch.stack((real_part, imag_part), dim=-1)

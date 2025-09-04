@@ -6,12 +6,16 @@ from ...frontend.torch_frontend import ScatteringTorch
 #BINYAMIN - START CHANGE
 from ...scattering2d.core.scattering2d import invertibleScattering2d
 from ...scattering2d.core.scattering2d import InverseScattering2D
+from ...scattering2d.core.scattering2d import _build_actuall_last_layer
+from ...scattering2d.core.scattering2d import _get_filters
 #BINYAMIN - END CHANGE
 
 
 class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='torch', out_type='array', model_kind='scattering', downsample=True, dilation_optimization=True):
+            backend='torch', out_type='array', model_kind='scattering',
+            downsample=True, dilation_optimization=True, tighten=False, filter_type='morlet',
+            sigma0=None, theta0=None, xi0=None, slant0=None):
         ScatteringTorch.__init__(self)
         ScatteringBase2D.__init__(**locals())
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
@@ -84,10 +88,10 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
             raise RuntimeError('Tensor must be contiguous.')
 
         if (input.shape[-1] != self.shape[-1] or input.shape[-2] != self.shape[-2]) and not self.pre_pad:
-            raise RuntimeError('Tensor must be of spatial size (%i,%i).' % (self.shape[0], self.shape[1]))
+            raise RuntimeError('Tensor must be of spatial size (%i,%i). but got (%i,%i)' % (self.shape[0], self.shape[1], input.shape[-2], input.shape[-1]))
 
         if (input.shape[-1] != self._N_padded or input.shape[-2] != self._M_padded) and self.pre_pad:
-            raise RuntimeError('Padded tensor must be of spatial size (%i,%i).' % (self._M_padded, self._N_padded))
+            raise RuntimeError('Padded tensor must be of spatial size (%i,%i). but got (%i,%i)' % (self._M_padded, self._N_padded, input.shape[-2], input.shape[-1]))
 
         if not self.out_type in ('array', 'list'):
             raise RuntimeError("The out_type must be one of 'array' or 'list'.")
@@ -147,6 +151,17 @@ class ScatteringTorch2D(ScatteringTorch, ScatteringBase2D):
                         self.backend, self.out_type, last_layer, dilation_optimization= self.dilation_optimization)
 
         return x
+    
+    def build_actuall_last_layer(self, coeffs):
+
+        phi, psi = self.load_filters()
+        return _build_actuall_last_layer(coeffs, self.J, self.L, self.max_order, phi, psi,
+                                           self.backend, self.out_type, self.downsample, self.dilation_optimization)
+
+    def get_filters(self):
+        phi, psi = self.load_filters()
+        return _get_filters(phi, psi, self.J, self.L, self.backend)
+
 
 
 ScatteringTorch2D._document()

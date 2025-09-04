@@ -6,10 +6,12 @@ import numpy as np
 
 class ScatteringNumPy2D(ScatteringNumPy, ScatteringBase2D):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend='numpy', out_type='array', downsample=True, dilation_optimization=True):
+            backend='numpy', out_type='array', downsample=True, dilation_optimization=True, tighten=False, filter_type='morlet',
+            theta0=None, xi0=None, sigma0=None, slant0=None, model_kind='scattering'):
         ScatteringNumPy.__init__(self)
         ScatteringBase2D.__init__(self, J, shape, L, max_order, pre_pad,
-                backend, out_type, downsample=downsample, dilation_optimization=dilation_optimization)
+                backend, out_type, downsample=downsample, dilation_optimization=dilation_optimization, tighten=tighten, filter_type=filter_type,
+                theta0=theta0, xi0=xi0, sigma0=sigma0, slant0=slant0, model_kind=model_kind)
         ScatteringBase2D._instantiate_backend(self, 'kymatio.scattering2d.backend.')
         ScatteringBase2D.build(self)
         ScatteringBase2D.create_filters(self, downsample=downsample)

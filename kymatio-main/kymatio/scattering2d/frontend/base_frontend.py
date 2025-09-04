@@ -6,7 +6,9 @@ from ..utils import compute_padding
 
 class ScatteringBase2D(ScatteringBase):
     def __init__(self, J, shape, L=8, max_order=2, pre_pad=False,
-            backend=None, out_type='array', model_kind='scattering', downsample=True, dilation_optimization=True):
+            backend=None, out_type='array', model_kind='scattering',
+            downsample=True, dilation_optimization=True, tighten=False, filter_type='morlet',
+            sigma0=None, theta0=None, xi0=None, slant0=None):
         super(ScatteringBase2D, self).__init__()
         self.pre_pad = pre_pad
         self.L = L
@@ -18,6 +20,12 @@ class ScatteringBase2D(ScatteringBase):
         self.model_kind = model_kind
         self.downsample = downsample
         self.dilation_optimization = dilation_optimization
+        self.tighten = tighten
+        self.filter_type = filter_type
+        self.sigma0 = sigma0
+        self.theta0 = theta0
+        self.xi0 = xi0
+        self.slant0 = slant0
 
     def build(self):
         M, N = self.shape
@@ -42,7 +50,9 @@ class ScatteringBase2D(ScatteringBase):
         #self.unpad = self.backend.unpad
 
     def create_filters(self, downsample=True):
-        filters = filter_bank(self._M_padded, self._N_padded, self.J, self.L, downsample=downsample, dilation_optimization=self.dilation_optimization)
+        filters = filter_bank(self._M_padded, self._N_padded, self.J, self.L, 
+                              downsample=downsample, dilation_optimization=self.dilation_optimization, tighten=self.tighten, filter_type=self.filter_type,
+                              sigma0=self.sigma0, theta0=self.theta0, xi0=self.xi0, slant0=self.slant0)
         self.phi, self.psi = filters['phi'], filters['psi']
 
     def scattering(self, x):

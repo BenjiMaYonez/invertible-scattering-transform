@@ -31,10 +31,10 @@ class ScatteringTensorFlow2D(ScatteringTensorFlow, ScatteringBase2D):
                                    'dimensions.')
 
             if (input.shape[-1] != self.shape[-1] or input.shape[-2] != self.shape[-2]) and not self.pre_pad:
-                raise RuntimeError('Tensor must be of spatial size (%i,%i).' % (self.shape[0], self.shape[1]))
+                raise RuntimeError('Tensor must be of spatial size (%i,%i). but got (%i,%i)' % (self.shape[0], self.shape[1], input.shape[-2], input.shape[-1]))
 
             if (input.shape[-1] != self._N_padded or input.shape[-2] != self._M_padded) and self.pre_pad:
-                raise RuntimeError('Padded tensor must be of spatial size (%i,%i).' % (self._M_padded, self._N_padded))
+                raise RuntimeError('Padded tensor must be of spatial size (%i,%i). but got (%i,%i)' % (self._M_padded, self._N_padded, input.shape[-2], input.shape[-1]))
 
             if not self.out_type in ('array', 'list'):
                 raise RuntimeError("The out_type must be one of 'array' or 'list'.")

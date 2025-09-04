@@ -249,8 +249,9 @@ def invertibleScattering2d(x, pad, unpad, backend, J, L, phi, psi, max_order,
                     'theta': -1, 
                     'depth' : 0,
                     'path' : (),
-                    'split' : 'no_split'})
-    
+                    'split' : 'no_split',
+                    'before_low_pass' : U_r
+                    })
 
     recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, max_order, 1 ,None, () ,out_type, out_S, downsample, dilation_optimization)
     # print("out_s.len : %d \n" %len(out_S) )
@@ -327,8 +328,10 @@ def recursiveInvertibleScattering2d(U_0_c, pad, unpad, backend, J, L, phi, psi, 
                             'theta': theta1, 
                             'depth' : level,
                             'path' : new_path,
-                            'split' : key})
-        
+                            'split' : key,
+                            'before_low_pass' : U_1[key]
+                        })
+
         for key,U_1_c in U_1.items():
             new_path = path + (n1,split_order[key])
             recursiveInvertibleScattering2d(U_1_c, pad, unpad, backend, J, L, phi, psi, max_order, level+1, n1, new_path, out_type, out_S, downsample, dilation_optimization)
@@ -430,18 +433,81 @@ def build_zero_last_layer(coefficients, J, L, max_order, phi, psi,
             if dilation_optimization and coeff['j'] >= j:#scale j must go down in each layer
                 continue
             
-            out_S.append({'coef': S_0,
-                'j': j,
-                'n': n,
-                'theta': theta,
-                'depth' : max_order+1,
-                'split' : coeff['split']}) 
-            
-        
-    
+            for split in ['re_pos', 'im_pos', 're_neg', 'im_neg', 'no_split']:
+                out_S.append({'coef': S_0,
+                    'j': j,
+                    'n': n,
+                    'theta': theta,
+                    'depth' : max_order+1,
+                    'split' : split})
+
     return out_S
 
-def RefacrorCoefficients(coefficients, J, L, max_order, phi, psi,
+
+def _build_actuall_last_layer(coefficients, J, L, max_order, phi, psi,
+                        backend, out_type='array',downsample=True, dilation_optimization=True):
+    """
+    Build the intermediate nodes computed in the last layer of the scattering
+    as if the scattering transform was computed up to max_order + 1.
+    """
+    modulus = backend.modulus
+    rfft = backend.rfft
+    ifft = backend.ifft
+    irfft = backend.irfft    
+    cdgmm = backend.cdgmm
+    stack = backend.stack
+    fft = backend.fft
+    custom_relu_split = backend.custom_relu_split
+    pad_cmplx = backend.pad_cmplx
+    unpad_cmplx = backend.unpad_cmplx
+    stack1 = backend.stack1 
+    subsample_fourier = backend.subsample_fourier
+
+
+
+    if downsample or dilation_optimization:
+        raise NotImplementedError("This function is not implemented for downsample=True or dilation_optimization=True")
+    
+    coefficients = sort_coefficients(coefficients)
+
+    num_of_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L, dilation_optimization=dilation_optimization)
+    num_of_coeffs = len(coefficients)
+    coefficients_in_last_layer = coefficients[num_of_coeffs - num_of_coeffs_in_last_layer : num_of_coeffs]
+
+    out_S = []
+    for coeff in coefficients_in_last_layer:
+        if coeff['depth'] != max_order:
+            raise RuntimeError('Wrong calculation of number of coeffs in the last layer')
+
+        U_r = coeff['before_low_pass']
+
+        for n1 in range(len(psi)):
+            j1 = psi[n1]['j']
+            theta1 = psi[n1]['theta']
+
+            U_1_c = cdgmm(U_r, psi[n1]['levels'][j1])#< F(x) , F(mother_n1) >
+            U_1_c = ifft(U_1_c)# x * mother_n1
+            U_1 = {}
+            U_1['re_pos'], U_1['im_pos'], U_1['re_neg'], U_1['im_neg'] = custom_relu_split(U_1_c)
+
+            split_order = {'re_pos': 0, 'im_pos': 1, 're_neg': 2, 'im_neg': 3, 'no_split': 4}
+            for key,signal in U_1.items():
+                new_path = coeff['path'] + (n1,split_order[key])
+                out_S.append({'coef': signal.squeeze().contiguous(),
+                                'j': j1,
+                                'n': n1,
+                                'theta': theta1, 
+                                'depth' : coeff['depth']+1,
+                                'path' : new_path,
+                                'split' : key
+                            })
+
+    return out_S
+
+def _get_filters(phi, psi, J, L, backend):
+    return phi,psi
+
+def  RefactorCoefficients(coefficients, J, L, max_order, phi, psi,
                         backend, out_type='array', last_layer=None, dilation_optimization=True):
     """
     Refactor the coefficients to match the shape of the wavelets (phi and psi).
@@ -483,24 +549,13 @@ def RefacrorCoefficients(coefficients, J, L, max_order, phi, psi,
     coefficients = sort_coefficients(coefficients)
     for coeff in coefficients:
         coeff['coef'] = from_real_to_complex(coeff['coef'])
-    # sorted_coefficients_by_path = coefficients.copy()
-    # sorted_coefficients_by_path.sort(key=lambda x: (x['depth'],x['path']))
-    # for i in range(len(sorted_coefficients_by_path)):
-    #     if sorted_coefficients_by_path[i]['path'] != coefficients[i]['path']:
-    #         raise RuntimeError('Sorting by path failed, the paths are not equal')
     
-    print("sorted coefficients by path: \n")
-    for coeff in coefficients:
-            print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'])    
+    # print("sorted coefficients by path: \n")
+    # for coeff in coefficients:
+    #         print("depth: ", coeff['depth'], " path: ", coeff['path']," j: ",coeff['j'], " theta: ",coeff['theta'], " split: ", coeff['split'])    
 
     return coefficients
-    # print("--------------------------------------------------")
-    # print("coefficients refactoring: \n")
-    # # Refactor the coefficients to match the shape of the wavelets (phi and psi).
-    # refactored_coefficients = []
-    # for coeff in coefficients:
-    #     #for debugging purposes
-    #     print("coeff  shape before refactoring: ", coeff['coef'].shape)
+
         
 
 
@@ -545,7 +600,7 @@ def InverseScattering2D(coefficients, J, L, max_order, phi, psi,
         raise RuntimeError('max_order must be less than J-1, max_order = %d, J-1 = %d' % (max_order, J-1))
     
 
-    coefficients = RefacrorCoefficients(coefficients, J, L, max_order, phi, psi,
+    coefficients = RefactorCoefficients(coefficients, J, L, max_order, phi, psi,
                         backend, out_type, last_layer, dilation_optimization)
 
     
@@ -555,81 +610,217 @@ def InverseScattering2D(coefficients, J, L, max_order, phi, psi,
     return RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
                                     backend, last_layer=last_layer, dilation_optimization=dilation_optimization)
 
+    # Stable pseudo-inverse of low-pass φ in Fourier (to undo averaging)
+    def _deavg_by_phi(child_map, j_lp):
+        # child_map is real (split after φ-avg); go to Fourier, un-average, back to space
+        C = fft(child_map)
+        # conjT
+        PH = phi['levels'][j_lp]    # φ^H in Fourier
+        # denom = |φ|^2; regularize to avoid divide-by-zero at DC complement
+        denom = PH.squeeze().norm()**2 #conjT
+        eps = 1e-6
+        Uhat = cdgmm(C, PH) / (denom + eps)
+        u = ifft(Uhat)
+        return u  # should be (numerically) real
+
 
 
 def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
-                        backend, last_layer, dilation_optimization=True):
-    
-    subsample_fourier = backend.subsample_fourier
-    modulus = backend.modulus
-    rfft = backend.rfft
-    ifft = backend.ifft
-    irfft = backend.irfft    
-    cdgmm = backend.cdgmm
-    stack = backend.stack
-    fft = backend.fft
-    pad_cmplx = backend.pad_cmplx
-    unpad_cmplx = backend.unpad_cmplx
-    stack1 = backend.stack1
+                                 backend, last_layer, dilation_optimization=True):
+    """
+    """
+    # Backend ops
+    rfft   = backend.rfft
+    irfft  = backend.irfft
+    fft    = backend.fft
+    ifft   = backend.ifft
+    cdgmm  = backend.cdgmm
+    conjT  = backend.conjugate_transpose
     custom_relu_unsplit = backend.custom_relu_unsplit
-    conjugate_transpose = backend.conjugate_transpose
-    zero_coeff = backend.zero_coeff
+    # (others available: modulus, subsample_fourier, pad/unpad, etc.)
 
+    def _real_part(x):
+        # Convert complex-packed tensor to real by dropping imag if needed.
+        # Assumes last dim==2 means (Re, Im); otherwise returns x as-is.
+        return x[..., 0] if (x is not None and hasattr(x, 'shape') and x.shape[-1] == 2) else x
     
-    #Convolve each of the last layer nodes with the corresponding congugated and transposed mother filter
-    #i.e: if the node y was of the form y=x*mother_n1 then computing y*mother_n1^H where H is the conjugate transpose
-    #using F^-1(<F(y), F(mother_n1^H)>)
-    #----------------------------------
-    #doing the same for the last coefficients
-    #i.e : if the coefficiant c was of the form c=x*father_n1 then computing c*mother_n1^H where H is the conjugate transpose
-    #using F^-1(<F(c), F(father_n1^H)>)
-    #----------------------------------
+    def _imag_part(x):
+        # Convert complex-packed tensor to real by dropping imag if needed.
+        # Assumes last dim==2 means (Re, Im); otherwise returns x as-is.
+        return x[..., 1] if (x is not None and hasattr(x, 'shape') and x.shape[-1] == 2) else x
 
-    num_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L, dilation_optimization=dilation_optimization)    
+    def _n_from_j_theta(j, theta):
+        return int(j) * L + int(theta)
+
+
+    # How many end-layer coeffs are at this recursion depth
+    num_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(
+        max_order, J, L, dilation_optimization=dilation_optimization
+    )
     num_coeffs = len(coefficients)
     last_coeffs = coefficients[num_coeffs - num_coeffs_in_last_layer : num_coeffs]
 
+    reconstructed_nodes = []
 
-##--------------  multiply the last layer nodes with the mother filters ----------------
-    reconstructed_nodes_splited = []
+    # Walk the "parent" low-pass coeffs of this layer and add detail from its children
     i = 0
-    for coeff in last_coeffs:
-        reconstructed_node = ifft(cdgmm(fft(coeff['coef']), (phi['levels'][coeff['j']])))#F^-1(<F(c), F(father^H)>)
-        
-        num_of_coeff_childrens = num_of_childrens(coeff,J,L, dilation_optimization)
-        corresponding_intermediate_nodes = last_layer[i:i+num_of_coeff_childrens]
-        i += num_of_coeff_childrens
+    for parent in last_coeffs:
+        # 0) Base: add low-pass contribution with φ^H (synthesis)
+        #    (Keep your index-by-j convention; with downsample=False, any level is same-sized.)
+        parent_j = parent['j'] if parent['j'] > 0 else 0
+        # conjT
+        phiH = (phi['levels'][parent_j])
+        parent_rec = ifft(cdgmm(fft(parent['coef']), phiH))
+        # print("real part of reconstructed parent with path:", parent.get('path', ()), "after low pass: ", _real_part(parent_rec).abs().max().item())
+        # print("imag part of reconstructed parent with path:", parent.get('path', ()), "after low pass: ", _imag_part(parent_rec).abs().max().item())
+        # trying to zero-out the imaginary part that comes from numerical errors
+        # parent_rec[...,1] = torch.zeros_like(parent_rec[...,1])
 
-        for (node, j) in zip(corresponding_intermediate_nodes, range(len(psi))):
-            j1 = psi[j]['j']
-            theta1 = psi[j]['theta']
-            reconstructed_node += ifft(cdgmm(fft(node['coef']), (psi[j]['levels'][j1])))#F^-1(<F(c), F(mother^H)>)
-        
-        reconstructed_nodes_splited.append({'coef': reconstructed_node,
-                                    'j': coeff['j'],
-                                    'n': coeff['n'],
-                                    'theta': coeff['theta'],
-                                    'depth' : coeff['depth'],
-                                    'split' : coeff['split']})
-##-----------------  apply relu unsplit to recollect every 4 nodes ----------------
+
+        # 1) Find the children that refine this parent
+        num_of_last_layer_nodes_under_parent = 4*num_of_childrens(parent, J, L, dilation_optimization)
+        children = last_layer[i : i + num_of_last_layer_nodes_under_parent]
+        i += num_of_last_layer_nodes_under_parent
+
+        # 2) Group children splits by their wavelet path (j, theta or n)
+        groups = {}
+        for ch in children:
+            # Identify path by (j, theta). If 'n' exists, it should be consistent with j,theta.
+            cj = int(ch.get('j', 0))
+            ctheta = int(ch.get('theta', 0))
+            key = (cj, ctheta)
+            grp = groups.setdefault(key, {})
+            # Attach this split map under its split name
+            split_name = ch.get('split', 'no_split')  # expect 're_pos','re_neg','im_pos','im_neg'
+            grp[split_name] = ch['coef']
+
+        # 3) For each (j, theta) group: de-average, unsplit -> complex z, then synthesize with ψ^H
+        for (cj, ctheta), parts in groups.items():
+            # Get all four splits (missing ones -> 0)
+            r_pos = parts.get('re_pos', backend.zero_coeff(parent['coef'].shape))
+            r_neg = parts.get('re_neg', backend.zero_coeff(parent['coef'].shape))
+            i_pos = parts.get('im_pos', backend.zero_coeff(parent['coef'].shape))
+            i_neg = parts.get('im_neg', backend.zero_coeff(parent['coef'].shape))
+
+            # Unsplit to signed Re/Im (linear, do this BEFORE wavelet synthesis)
+            # custom_relu_unsplit expects (relu_real, relu_imag, relu_neg_real, relu_neg_imag) as real maps
+            z = custom_relu_unsplit(r_pos[...,0],i_pos[...,1], r_neg[...,0], i_neg[...,1])  # returns complex-packed map
+
+            # Synthesize with ψ^H corresponding to THIS path
+            n_idx = _n_from_j_theta(cj, ctheta)
+            # conjT
+            # psiH = (2**(-cj))*(psi[n_idx]['levels'][0])  # TODO: this shouldn't always be [0] if downsample=False 
+            psiH = (psi[n_idx]['levels'][0])  # TODO: this shouldn't always be [0] if downsample=False 
+
+            # print("cj = ", cj, " ctheta = ", ctheta, " n_idx = ", n_idx)
+            parent_rec += ifft(cdgmm(fft(z), psiH))
+
+        # Push this reconstructed parent (now "last layer" for the next recursion)
+        reconstructed_nodes.append({
+            'coef': parent_rec,
+            'j':    parent['j'],
+            'n':    parent.get('n', _n_from_j_theta(parent['j'], parent.get('theta', 0))),
+            'theta': parent.get('theta', 0),
+            'depth': parent['depth'],
+            'split': parent.get('split', 'no_split'), # the coefficient's 'split' value tells us from which split it came from
+            'path': parent.get('path', ())
+        })
+
+    # Base case: at order 0 there is only one node left (the image)
     if max_order == 0:
-        return reconstructed_nodes_splited[0]['coef']
-    
-    reconstructed_nodes = []    
-    for i in range(0,len(reconstructed_nodes_splited),4):
-        unified_node = custom_relu_unsplit(reconstructed_nodes_splited[i]['coef'][...,0], reconstructed_nodes_splited[i+1]['coef'][...,1], reconstructed_nodes_splited[i+2]['coef'][...,0], reconstructed_nodes_splited[i+3]['coef'][...,1])
-        reconstructed_nodes.append({'coef': unified_node,
-                                    'j': reconstructed_nodes_splited[i]['j'],
-                                    'n': reconstructed_nodes_splited[i]['n'],
-                                    'theta': reconstructed_nodes_splited[i]['theta'],
-                                    'depth' : reconstructed_nodes_splited[i]['depth'],
-                                    'split' : 'no_split'})
-    
-    return RecursiveInverseScattering2D(coefficients[0:num_coeffs - num_coeffs_in_last_layer], J, L, max_order-1, phi, psi,
-                        backend, last_layer=reconstructed_nodes, dilation_optimization=dilation_optimization)
+        return reconstructed_nodes[0]['coef']
+
+    # Recurse upward
+    return RecursiveInverseScattering2D(
+        coefficients[0 : num_coeffs - num_coeffs_in_last_layer],
+        J, L, max_order - 1, phi, psi, backend,
+        last_layer=reconstructed_nodes,
+        dilation_optimization=dilation_optimization
+    )
 
 
     
+#older version:
+
+# def RecursiveInverseScattering2D(coefficients, J, L, max_order, phi, psi,
+#                         backend, last_layer, dilation_optimization=True):
+    
+#     subsample_fourier = backend.subsample_fourier
+#     modulus = backend.modulus
+#     rfft = backend.rfft
+#     ifft = backend.ifft
+#     irfft = backend.irfft    
+#     cdgmm = backend.cdgmm
+#     stack = backend.stack
+#     fft = backend.fft
+#     pad_cmplx = backend.pad_cmplx
+#     unpad_cmplx = backend.unpad_cmplx
+#     stack1 = backend.stack1
+#     custom_relu_unsplit = backend.custom_relu_unsplit
+#     conjugate_transpose = backend.conjugate_transpose
+#     zero_coeff = backend.zero_coeff
+
+    
+#     #Convolve each of the last layer nodes with the corresponding congugated and transposed mother filter
+#     #i.e: if the node y was of the form y=x*mother_n1 then computing y*mother_n1^H where H is the conjugate transpose
+#     #using F^-1(<F(y), F(mother_n1^H)>)
+#     #----------------------------------
+#     #doing the same for the last coefficients
+#     #i.e : if the coefficiant c was of the form c=x*father_n1 then computing c*mother_n1^H where H is the conjugate transpose
+#     #using F^-1(<F(c), F(father_n1^H)>)
+#     #----------------------------------
+
+#     num_coeffs_in_last_layer = num_of_scattering_coefficients_in_layer(max_order, J, L, dilation_optimization=dilation_optimization)    
+#     num_coeffs = len(coefficients)
+#     last_coeffs = coefficients[num_coeffs - num_coeffs_in_last_layer : num_coeffs]
+
+
+# ##--------------  multiply the last layer nodes with the mother filters ----------------
+#     reconstructed_nodes_splited = []
+#     i = 0
+#     for coeff in last_coeffs:
+#         reconstructed_node = ifft(cdgmm(fft(coeff['coef']), (phi['levels'][coeff['j']])))#F^-1(<F(c), F(father^H)>)
+        
+#         num_of_coeff_childrens = num_of_childrens(coeff,J,L, dilation_optimization)
+#         corresponding_intermediate_nodes = last_layer[i:i+num_of_coeff_childrens]
+#         i += num_of_coeff_childrens
+
+#         for (node, j) in zip(corresponding_intermediate_nodes, range(len(psi))):
+#             # j1 = psi[j]['j']
+#             # theta1 = psi[j]['theta']
+#             # reconstructed_node += ifft(cdgmm(fft(node['coef']), (psi[j]['levels'][j1])))#F^-1(<F(c), F(mother^H)>)
+            
+#             j1 = node['j']
+#             theta1 = node['theta']
+#             n_idx = j1 * L + theta1
+#             curr_psi = psi[n_idx]['levels'][0]
+#             reconstructed_node += ifft(cdgmm(fft(node['coef']), (curr_psi)))#F^-1(<F(c), F(mother^H)>)
+
+
+
+#         reconstructed_nodes_splited.append({'coef': reconstructed_node,
+#                                     'j': coeff['j'],
+#                                     'n': coeff['n'],
+#                                     'theta': coeff['theta'],
+#                                     'depth' : coeff['depth'],
+#                                     'split' : coeff['split']})
+# ##-----------------  apply relu unsplit to recollect every 4 nodes ----------------
+#     if max_order == 0:
+#         return reconstructed_nodes_splited[0]['coef']
+    
+#     reconstructed_nodes = []    
+#     for i in range(0,len(reconstructed_nodes_splited),4):
+#         unified_node = custom_relu_unsplit(reconstructed_nodes_splited[i]['coef'][...,0], reconstructed_nodes_splited[i+1]['coef'][...,1], reconstructed_nodes_splited[i+2]['coef'][...,0], reconstructed_nodes_splited[i+3]['coef'][...,1])
+#         reconstructed_nodes.append({'coef': unified_node,
+#                                     'j': reconstructed_nodes_splited[i]['j'],
+#                                     'n': reconstructed_nodes_splited[i]['n'],
+#                                     'theta': reconstructed_nodes_splited[i]['theta'],
+#                                     'depth' : reconstructed_nodes_splited[i]['depth'],
+#                                     'split' : 'no_split'})
+    
+#     return RecursiveInverseScattering2D(coefficients[0:num_coeffs - num_coeffs_in_last_layer], J, L, max_order-1, phi, psi,
+#                         backend, last_layer=reconstructed_nodes, dilation_optimization=dilation_optimization)
+
 
 
 
